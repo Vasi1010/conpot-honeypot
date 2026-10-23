@@ -31,7 +31,8 @@ conpot-honeypot/
 │   ├── classify.py        #   function codes -> request type + scan/read/write
 │   └── conpot_parser.py   #   parse_log() + CLI
 ├── analysis/
-│   └── detection.py       # Low/Medium/High risk per source IP
+│   ├── detection.py       # Low/Medium/High risk per source IP
+│   └── charts.py          # report/PPT charts (PNG) + CSV export
 └── tests/                 # pytest suite
 ```
 
@@ -86,6 +87,23 @@ protocols within `--window` seconds (a multi-protocol scan).
 Scans are: port probes (connect, no request), Modbus FC 8/17/43, S7 SZL / COTP
 connect, SNMP system-group OIDs, HTTP GET of `/` or `/index.html`, and multi-protocol
 contact within the window.
+
+### Charts and CSVs for the report
+
+```bash
+python -m analysis.charts logs/conpot.log --out output/
+```
+
+Writes 16:9 PNGs (200 dpi, slide-ready) and the tables to `output/` (git-ignored):
+
+| file | shows |
+|------|-------|
+| `attacks_per_protocol.png` | events per protocol |
+| `event_timeline.png` | events over time, stacked by stage (scan / read / write) |
+| `reads_vs_writes.png` | scans vs reads vs writes per protocol, with the write-attempt count |
+| `top_source_ips.png` | busiest source IPs, coloured and labelled by risk level |
+| `parsed_events.csv` | the full parsed table |
+| `risk_by_ip.csv` | the detection table |
 
 ## Port map (VM)
 
