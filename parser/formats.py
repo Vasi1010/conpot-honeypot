@@ -99,4 +99,16 @@ class TextFormat:
                 "event": "request", "session_id": sid, "pattern": "fallback", "fields": {}}
 
 
-FORMATS = [JsonFormat(), TextFormat()]
+class BareNoiseFormat:
+    """Known noise lines that carry no timestamp (stderr warnings, banners)."""
+
+    name = "bare_noise"
+
+    def sniff(self, line):
+        return any(p.search(line) for p in P.BARE_IGNORE_PATTERNS)
+
+    def parse(self, line):
+        return IGNORED
+
+
+FORMATS = [JsonFormat(), TextFormat(), BareNoiseFormat()]

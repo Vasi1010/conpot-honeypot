@@ -74,6 +74,31 @@ IGNORE_PATTERNS = [re.compile(p) for p in (
     r"client disconnected",
     r"\bresponse to\b",
     r"(?i)session (?:timed out|ended)",
+    # Conpot 0.6.0 startup / configuration
+    r"--force option specified",
+    r"^Found and enabled \w+ protocol",
+    r"^(?:Conpot \w+|IPMI BMC) initialized",
+    r"^Class\s+\d+/0x[0-9a-fA-F]+, Instance",       # ENIP object table dump
+    r"^Using default FS path",
+    r"^Initializing Virtual File System",
+    r"^Creating persistent data store",
+    r"T?FTP Serving File System",
+    r"^Starting TFTP server",
+    r"^No proxy template found",
+    r"^handle server PID",                           # ENIP server
+    # Session bookkeeping. The attacker's activity is the connect/traffic line
+    # next to each of these, so counting them would double-count it.
+    r"^New \w+ session from",
+    r"^Modbus response sent to",
+    r"^Exception caught: Modbus Error",              # also shown as exception= in details
+)]
+
+# Known noise with no timestamp: Python logging's stderr copies of lines that
+# are also logged with a timestamp ("WARNING:root:...", "ERROR:conpot....:"),
+# and Conpot's VFS banner.
+BARE_IGNORE_PATTERNS = [re.compile(p) for p in (
+    r"^(?:DEBUG|INFO|WARNING|ERROR|CRITICAL):[\w.]+:",
+    r"^\s*Please wait while the system copies",
 )]
 
 # --------------------------------------------------------------------------- JSON log

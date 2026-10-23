@@ -5,7 +5,8 @@ Turn a matched log line into meaning: request type, function code, and an
     action   meaning
     ------   ---------------------------------------------------------------
     scan     discovery / fingerprinting: identification requests (Modbus 8/17/43,
-             S7 SZL reads, SNMP system-group OIDs, HTTP GET of / or /index.html)
+             S7 SZL reads, SNMP system-group OIDs, HTTP GET of /, /index.html
+             or /favicon.ico)
              and connections that never sent a request (port probes; set
              later in conpot_parser.py)
     read     reads process data
@@ -77,8 +78,9 @@ SZL_NAMES = {
 
 SNMP_SYSTEM_GROUP = "1.3.6.1.2.1.1"   # sysDescr, sysName, ... = device fingerprinting
 HTTP_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-# Fetching the landing page is what scanners (zgrab, masscan banners, Shodan) do.
-HTTP_SCAN_PATHS = {"/", "/index.html"}
+# Fetching the landing page is what scanners (zgrab, masscan banners, Shodan) do;
+# the favicon is a common web-server fingerprint (e.g. Shodan's favicon hash).
+HTTP_SCAN_PATHS = {"/", "/index.html", "/favicon.ico"}
 
 
 def classify(protocol, event, fields):
@@ -121,9 +123,12 @@ def _modbus(fields):
         addr, value = struct.unpack(">HH", data[:4])
         details.append(f"addr={addr} value={value}")
 
-    resp = to_bytes(fields.get("response"))
-    if resp and len(resp) >= 9 and resp[7] & 0x80:
-        details.append(f"exception={resp[8]}")  # honeypot rejected the request
+    # The response is logged with its MBAP header, or (Conpot 0.6.0) as a bare
+    # PDU like b'8302'. Either way an exception reply is fc|0x80 + code.
+    resp = to_bytes(fields.get("response")) or b""
+    pdu = resp[7:] if len(resp) >= 9 and resp[7] in (fc, fc | 0x80) else resp
+    if len(pdu) >= 2 and pdu[0] == fc | 0x80:
+        details.append(f"exception={pdu[1]}")  # honeypot rejected the request
     return _result(name, fc, action, " ".join(details))
 
 

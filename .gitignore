@@ -15,11 +15,11 @@ Thumbs.db
 snap7.dll
 *.so
 
-# Keep the logs/ folder but ignore stray local captures by default.
-# (Delete this rule if you WANT to commit the handoff conpot.log.)
+# Keep the logs/ folder but never commit captures: a real conpot.log contains
+# the honeypot's public IP ("Fetched <ip> as external ip"). Anonymized excerpts
+# belong in sample_logs/.
 logs/*.log
 !logs/.gitkeep
-!logs/conpot.log
 
 # Analysis outputs (charts, parsed CSVs) and test cache
 output/

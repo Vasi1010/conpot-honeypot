@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from parser import COLUMNS, ParseStats, parse_log
@@ -88,3 +89,17 @@ def test_docker_logs_sample():
     assert len(gw) == 5 and gw["is_docker_gateway"].all()
     assert gw["action"].tolist() == ["connect", "read", "write", "connect", "scan"]
     assert not df.loc[df["src_ip"] == "192.168.56.1", "is_docker_gateway"].any()
+
+
+def test_conpot_060_real_log():
+    """Anonymized excerpt of a real Conpot 0.6.0 `docker logs` capture."""
+    stats = ParseStats()
+    df = parse_log(SAMPLES / "conpot_0.6.0_real.log", tz="UTC", stats=stats)
+    # Startup lines, stderr copies, session/response bookkeeping: all ignored, none unknown.
+    assert (stats.parsed, stats.ignored, stats.unparseable, stats.fallback) == (4, 11, 0, 0)
+    assert df["pattern"].tolist() == ["http_request", "connect", "modbus_traffic", "modbus_traffic"]
+    assert df["action"].tolist() == ["scan", "connect", "scan", "read"]
+    assert df.iloc[0]["details"] == "path=/favicon.ico"
+    # 0.6.0 logs the response as a bare PDU (b'8302'), not with the MBAP header.
+    assert df.iloc[3]["details"] == "addr=0 count=5 exception=2"
+    assert (df["src_port"] == pd.Series([33620, 48510, 48510, 48510])).all()

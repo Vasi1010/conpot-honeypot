@@ -249,18 +249,12 @@ The scripts already target `127.0.0.1` (the NAT-forwarded ports). Keep the VM's
     tail -n 40 conpot.log
     ```
 
-24. Hand `conpot.log` to your teammate. Easiest route, since they're a repo
-    collaborator — copy it into the repo and push:
-    ```bash
-    # copy conpot.log from the VM into C:\Users\wahee\honeypot\logs\ on the laptop
-    # (shared folder, scp, or drag-and-drop), then on the laptop:
-    ```
-    ```powershell
-    cd C:\Users\wahee\honeypot
-    git add logs\conpot.log
-    git commit -m "Add captured conpot.log for analysis"
-    git push
-    ```
+24. Hand `conpot.log` to your teammate **privately** (shared folder, scp, chat
+    attachment); they drop it into `logs\` in their checkout. **Don't commit
+    it**: the log contains the honeypot's public IP ("Fetched <ip> as external
+    ip"), and `.gitignore` excludes `logs/*.log` for that reason. If a real
+    excerpt is useful for tests, anonymize it (replace public IPs with
+    documentation addresses like `203.0.113.10`) and put it in `sample_logs/`.
 
 ---
 

@@ -103,3 +103,29 @@ def test_http_classification(method, path, action):
     df = parse_lines([f"2026-10-21 10:40:18,395 HTTP/1.1 {method} request from ('1.2.3.4', 52011): "
                       f"('{path}', [('Host', '192.168.1.50')], None). 16ac4191-a26a-40ae-844f-1574f037afc6"])
     assert (df.iloc[0]["action"], df.iloc[0]["details"]) == (action, f"path={path}")
+
+
+@pytest.mark.parametrize("line", [
+    "WARNING:root:--force option specified. Using testing configuration",
+    "ERROR:conpot.protocols.modbus.slave:Exception caught: Modbus Error: Exception code = 2.",
+    " Please wait while the system copies all specified files",
+    "2026-10-23 17:10:50,710 Found and enabled modbus protocol.",
+    "2026-10-23 17:10:50,725 IPMI BMC initialized.",
+    "2026-10-23 17:10:50,731 Class    22/0x0016, Instance   1, Attribute     1 <== [{'class': 22}]",
+    "2026-10-23 17:10:50,747 FTP Serving File System at /data/ftp/ in vfs. FTP data_fs sub directory: /ftp",
+    "2026-10-23 17:10:50,769 No proxy template found. Service will remain unconfigured/stopped.",
+    "2026-10-23 17:10:51,104 handle server PID [    1] running on ('0.0.0.0', 44818)",
+    "2026-10-23 17:12:06,188 New http session from 172.17.0.1 (31e54764-bf5f-435d-8b1b-4387e2b7e4a4)",
+    "2026-10-23 17:15:01,466 Modbus response sent to 172.17.0.1",
+])
+def test_conpot_060_noise_is_ignored(line):
+    stats = ParseStats()
+    assert parse_lines([line], stats=stats).empty
+    assert (stats.ignored, stats.unparseable, stats.fallback) == (1, 0, 0)
+
+
+def test_modbus_exception_with_mbap_header():
+    df = parse_lines(["2026-10-21 10:00:00,000 Modbus traffic from 10.0.0.9: "
+                      "{'request': b'000200000006010300000005', 'function_code': 3, "
+                      "'response': b'000200000003018302'}"])
+    assert df.iloc[0]["details"] == "addr=0 count=5 exception=2"
