@@ -109,22 +109,18 @@
                   fill=hpblue!8,minimum height=1.05cm,font=\footnotesize,inner sep=5pt},
       arr/.style={-{Stealth[length=3mm]},very thick,hpblue}]
     \node[box] (lap)    {Windows laptop\\\textit{Python probes}};
-    \node[box,right=0.7cm of lap] (nat) {VirtualBox NAT\\\texttt{127.0.0.1}\\forwards};
-    \node[box,right=0.7cm of nat] (vm)  {Ubuntu VM};
-    \node[box,right=0.7cm of vm]  (dkr) {Docker};
-    \node[box,right=0.7cm of dkr,fill=hpred!8,draw=hpred] (cp) {\textbf{Conpot}\\Siemens S7-200};
-    \draw[arr] (lap) -- (nat);
-    \draw[arr] (nat) -- (vm);
-    \draw[arr] (vm)  -- (dkr);
+    \node[box,right=1.0cm of lap] (dkr) {Docker Desktop\\publishes to\\\texttt{127.0.0.1}};
+    \node[box,right=1.0cm of dkr,fill=hpred!8,draw=hpred] (cp) {\textbf{Conpot}\\Siemens S7-200};
+    \draw[arr] (lap) -- (dkr);
     \draw[arr] (dkr) -- (cp);
   \end{tikzpicture}
   \end{center}
   \vfill
   \begin{columns}[T]
     \begin{column}{0.5\textwidth}
-      Attacker and honeypot run on one laptop: a VirtualBox \textbf{NAT} forward maps
-      the ICS ports to \texttt{127.0.0.1}, so every probe targets localhost and reaches
-      the Conpot container inside the VM.
+      Attacker and honeypot run on one laptop: the Conpot \textbf{Docker} container
+      publishes its ICS ports on \texttt{127.0.0.1}, so every probe targets localhost
+      and reaches the container directly.
     \end{column}
     \begin{column}{0.5\textwidth}
       \centering
@@ -184,10 +180,10 @@
     \end{column}
     \begin{column}{0.46\textwidth}
       \begin{itemize}
-        \item \textbf{24 attacker events} from a single source (\texttt{10.0.2.2}, the
-              NAT gateway = our laptop).
+        \item \textbf{25 attacker events} from a single source (\texttt{172.17.0.1}, the
+              Docker bridge gateway = our laptop).
         \item \textbf{SNMP} dominated (14) --- the full system-tree walk.
-        \item \textbf{Modbus} (8): connect, four register reads, one write.
+        \item \textbf{Modbus} (9): connect, four register reads, one write.
         \item \textbf{S7comm} (2): connection/identification probes.
       \end{itemize}
     \end{column}
@@ -232,7 +228,7 @@
         \item action: \textbf{scan / read / write}
         \item source IP (+ private / Docker-gateway flags)
       \end{itemize}
-      136 log lines $\to$ 24 clean events, verified by a \textbf{79-test} suite.
+      131 log lines $\to$ 25 clean events, verified by a \textbf{79-test} suite.
     \end{column}
   \end{columns}
 \end{frame}
@@ -246,7 +242,7 @@
       Per source IP, the detector scores risk from the attack \emph{sequence},
       multi-protocol scanning and any write attempts.
       \vfill
-      \begin{block}{Our capture: \texttt{10.0.2.2}}
+      \begin{block}{Our capture: \texttt{172.17.0.1}}
         Risk: \high\\
         Sequence: \textbf{\seq}\\
         Protocols: modbus, s7comm, snmp\\
@@ -283,8 +279,8 @@
 % =====================================================================
 \begin{frame}{Ethics \& scope}
   \begin{itemize}
-    \item Every probe targets \textbf{our own} honeypot VM on a \textbf{private, isolated}
-          LAN --- a university assignment.
+    \item Every probe targets \textbf{our own} honeypot container on \textbf{localhost}
+          --- a private, isolated university assignment.
     \item Conpot is purpose-built to be scanned and attacked; no third party is involved.
     \item No tool here is pointed at any host we do not own or have permission to test.
   \end{itemize}
@@ -299,7 +295,7 @@
   \textbf{What we built}
   \begin{itemize}
     \item A working Conpot ICS honeypot (Siemens S7-200) exercised over Modbus, SNMP and S7comm.
-    \item Our own captured attack traffic: 24 events, 3 protocols, scored \high{} risk.
+    \item Our own captured attack traffic: 25 events, 3 protocols, scored \high{} risk.
     \item An automated pipeline --- parser, risk detection, charts and a live dashboard
           --- with a 79-test suite.
   \end{itemize}

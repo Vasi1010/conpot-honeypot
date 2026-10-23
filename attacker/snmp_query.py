@@ -127,7 +127,7 @@ async def main():
     banner(f"SNMP WALK of system subtree {SYSTEM_SUBTREE}")
     await snmp_walk(engine, SYSTEM_SUBTREE)
 
-    banner("Done. Check conpot.log on the VM for the logged SNMP requests.")
+    banner("Done. Check the container log (docker logs conpot) for the logged SNMP requests.")
 
 
 if __name__ == "__main__":

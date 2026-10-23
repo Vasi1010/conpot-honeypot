@@ -42,7 +42,7 @@ def main():
 
     if not client.connect():
         print(f"[!] Could not open TCP connection to {VM_IP}:{PORT}")
-        print("    Check: VM reachable (ping), Docker container up, port 502 mapped.")
+        print("    Check: Docker container up (docker ps), port 502 published on 127.0.0.1.")
         return
 
     print(f"[+] TCP connected to {VM_IP}:{PORT}")
@@ -100,7 +100,7 @@ def main():
         print(f"[+] read-back holding[0]   -> {rr.registers}")
 
     client.close()
-    banner("Done. Check conpot.log on the VM for the logged requests.")
+    banner("Done. Check the container log (docker logs conpot) for the logged requests.")
 
 
 if __name__ == "__main__":
