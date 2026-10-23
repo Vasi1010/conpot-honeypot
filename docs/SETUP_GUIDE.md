@@ -29,7 +29,7 @@ ports to the laptop. So from the laptop you always attack **`127.0.0.1`**.
 | Windows laptop | **Python 3.x** | <https://www.python.org/downloads/> (tick "Add to PATH") | Already installed (3.13). |
 | Windows laptop | **Probe deps** (pymodbus, pysnmp) | `pip install -r requirements.txt` (Part E) | Yes |
 | Windows laptop | **Nmap** (optional, for verifying) | <https://nmap.org/download.html> | Optional |
-| Windows laptop | **snap7.dll** (optional, only for S7) | <https://sourceforge.net/projects/snap7/files/> | Optional |
+| Windows laptop | **python-snap7** (optional, only for S7) | `pip install python-snap7` — native lib bundled, no DLL needed | Optional |
 | Windows laptop | **Net-SNMP** (only if pysnmp fails) | <https://sourceforge.net/projects/net-snmp/files/> | Fallback only |
 
 Nothing here needs a specific old version. The one trap we already hit and fixed:
@@ -284,5 +284,5 @@ The scripts already target `127.0.0.1` (the NAT-forwarded ports). Keep the VM's
 | T5 | `docker: permission denied` | You dropped the `sudo`. Use `sudo docker ...`. |
 | T6 | SNMP returns nothing | Wrong community or template. Confirm `public`; try `snmpwalk -v2c -c public 127.0.0.1 1.3.6.1.2.1.1`. |
 | T7 | SNMP errors / `No module named 'imp'` | You have the OLD pysnmp 4.4 (dead on Python 3.12+). Fix: `pip uninstall -y pysnmp && pip install "pysnmp==7.1.30"`. Last resort: the `snmpwalk` CLI. |
-| T8 | S7 script: "can't find snap7 library" | Put `snap7.dll` on PATH (next to the script or in `System32`). S7 is optional. |
+| T8 | S7 script import error (e.g. `No module named 'pkg_resources'`) | You have the old python-snap7 1.x. Fix: `pip install "python-snap7==3.3.0"` (modern wheel bundles the native lib; no DLL). S7 is optional. |
 | T9 | Pulled image is very old / won't start | Build from source instead: `git clone https://github.com/mushorg/conpot.git` then `cd conpot && sudo make build-docker && sudo make run-docker`. |
