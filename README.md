@@ -30,6 +30,8 @@ conpot-honeypot/
 │   ├── formats.py         #   pluggable formats: TextFormat (regex), JsonFormat
 │   ├── classify.py        #   function codes -> request type + scan/read/write
 │   └── conpot_parser.py   #   parse_log() + CLI
+├── analysis/
+│   └── detection.py       # Low/Medium/High risk per source IP
 └── tests/                 # pytest suite
 ```
 
@@ -63,6 +65,27 @@ as `--tz` (default `Asia/Kolkata`). A missing or empty file gives an empty table
 Unparseable lines are skipped and counted, and lines that only partly match but
 contain an IP are kept as `pattern == "fallback"` rows. The CLI lists both kinds,
 so if the real log has any, adjust `parser/patterns.py`.
+
+### Attack-sequence detection
+
+```bash
+python -m analysis.detection logs/conpot.log --csv output/risk_by_ip.csv   # --window 60
+```
+
+One row per source IP with `risk`, `sequence` (stages in first-seen order, e.g.
+`scan -> read -> write`), `write_flag`, scan/read/write counts, and whether the IP hit 2+
+protocols within `--window` seconds (a multi-protocol scan).
+
+| risk   | when |
+|--------|------|
+| High   | any write (read -> write, scan -> read -> write; every write is flagged) |
+| Medium | reads, no write (scan -> read) |
+| Low    | scans only |
+| Info   | traffic, but nothing classified as scan/read/write |
+
+Scans are: port probes (connect, no request), Modbus FC 8/17/43, S7 SZL / COTP
+connect, SNMP system-group OIDs, HTTP GET of `/` or `/index.html`, and multi-protocol
+contact within the window.
 
 ## Port map (VM)
 

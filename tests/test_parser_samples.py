@@ -29,9 +29,9 @@ def test_sample_has_expected_shape(text_df):
 def test_actions_per_attacker(text_df):
     """Each sample attacker exercises a different attack sequence for the detection step."""
     acts = text_df[text_df["action"] != "connect"].groupby("src_ip")["action"].agg(set)
-    assert acts["198.51.100.77"] == {"scan", "read"}             # recon only (HTTP GET is a read)
+    assert acts["198.51.100.77"] == {"scan"}                     # recon only
     assert {"scan", "read", "write"} <= acts["192.168.1.23"]     # scan -> read -> write
-    assert {"read", "write"} <= acts["203.0.113.45"]             # read -> write
+    assert {"read", "write"} <= acts["203.0.113.45"]             # (scan ->) read -> write
     assert acts["198.51.100.200"] == {"scan", "read"}  # scan -> read, no write
 
 
@@ -64,7 +64,7 @@ def test_s7_and_snmp_identification_are_scans(text_df):
 
 def test_http_methods(text_df):
     http = text_df[text_df["protocol"] == "http"]
-    assert list(http["action"]) == ["read", "read", "read", "write"]
+    assert list(http["action"]) == ["scan", "scan", "scan", "write"]  # GET / and /index.html are scans
     assert http.iloc[-1]["details"] == "path=/index.html"
 
 

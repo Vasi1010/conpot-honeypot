@@ -4,9 +4,10 @@ Turn a matched log line into meaning: request type, function code, and an
 
     action   meaning
     ------   ---------------------------------------------------------------
-    scan     discovery / fingerprinting: identification requests (Modbus 43,
-             S7 SZL reads, SNMP system-group OIDs) and connections that never
-             sent a request (port probes; set later in conpot_parser.py)
+    scan     discovery / fingerprinting: identification requests (Modbus 8/17/43,
+             S7 SZL reads, SNMP system-group OIDs, HTTP GET of / or /index.html)
+             and connections that never sent a request (port probes; set
+             later in conpot_parser.py)
     read     reads process data
     write    changes PLC state (registers, coils, variables, setpoints, stop/start)
     connect  a TCP session opened (its requests are separate rows)
@@ -76,6 +77,8 @@ SZL_NAMES = {
 
 SNMP_SYSTEM_GROUP = "1.3.6.1.2.1.1"   # sysDescr, sysName, ... = device fingerprinting
 HTTP_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+# Fetching the landing page is what scanners (zgrab, masscan banners, Shodan) do.
+HTTP_SCAN_PATHS = {"/", "/index.html"}
 
 
 def classify(protocol, event, fields):
@@ -177,8 +180,14 @@ def _http(fields):
     if not method:
         return None
     m = _HTTP_PATH_RE.search(str(fields.get("payload") or fields.get("request") or ""))
-    action = "write" if method in HTTP_WRITE_METHODS else "read"
-    return _result(f"HTTP {method}", None, action, f"path={m.group(1)}" if m else "")
+    path = m.group(1) if m else ""
+    if method in HTTP_WRITE_METHODS:
+        action = "write"
+    elif method in ("GET", "HEAD") and path in HTTP_SCAN_PATHS:
+        action = "scan"
+    else:
+        action = "read"
+    return _result(f"HTTP {method}", None, action, f"path={path}" if path else "")
 
 
 # --------------------------------------------------------------------------- helpers
