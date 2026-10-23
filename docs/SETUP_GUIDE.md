@@ -22,7 +22,8 @@ ports to the laptop. So from the laptop you always attack **`127.0.0.1`**.
 
 | Where | Software | How to get it | Needed? |
 |-------|----------|---------------|---------|
-| VM host PC | **VirtualBox + an Ubuntu VM** | <https://www.virtualbox.org/wiki/Downloads> + Ubuntu ISO | You already have this (the VM runs). |
+| This laptop | **VirtualBox** (Windows host) | <https://www.virtualbox.org/wiki/Downloads> → "Windows hosts" | Yes — install first (Part 0). |
+| This laptop | **Ubuntu 26.04 LTS ISO** | <https://ubuntu.com/download/desktop> → Intel/AMD 64-bit | Yes |
 | Inside the VM | **Docker** | `sudo apt install docker.io` (Part A) | Yes |
 | Inside the VM | **Conpot image** | `sudo docker pull honeynet/conpot` (Part B) | Yes |
 | Windows laptop | **Python 3.x** | <https://www.python.org/downloads/> (tick "Add to PATH") | Already installed (3.13). |
@@ -34,6 +35,25 @@ ports to the laptop. So from the laptop you always attack **`127.0.0.1`**.
 Nothing here needs a specific old version. The one trap we already hit and fixed:
 the SNMP library **must be the modern pysnmp** (`requirements.txt` pins 7.x) —
 the old pysnmp 4.4 is broken on Python 3.12+.
+
+---
+
+## Part 0 — Install VirtualBox + the Ubuntu VM (on this laptop)
+
+0.1 🪟 **[Laptop]** Download VirtualBox (**Windows hosts**) from
+    <https://www.virtualbox.org/wiki/Downloads> and run the installer with the
+    defaults. Click **Yes** at the "Network Interfaces will reset" warning (Wi-Fi
+    blips briefly) and **Install** any Oracle driver prompt.
+
+0.2 🪟 **[Laptop]** Download the Ubuntu Desktop ISO (**Intel or AMD 64-bit**)
+    from <https://ubuntu.com/download/desktop>.
+
+0.3 🖱️ **[VirtualBox]** **New** → Name `conpot-vm`, Type **Linux**, Version
+    **Ubuntu (64-bit)** → **ISO Image** = the downloaded `.iso` → RAM **4096 MB**,
+    CPUs **2**, Disk **25 GB** → **Start** → **Install Ubuntu**, set a
+    username/password, finish, and reboot.
+
+0.4 🐧 **[VM]** Open **Terminal** inside Ubuntu. You are now ready for Part A.
 
 ---
 
