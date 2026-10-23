@@ -48,7 +48,7 @@ def main():
         client.connect(VM_IP, RACK, SLOT, PORT)
     except Exception as exc:
         print(f"[!] Could not connect: {exc}")
-        print("    Check: VM reachable, container up, port 102 mapped, try slot=1.")
+        print("    Check: container up (docker ps), port 102 published on 127.0.0.1, try slot=1.")
         return
 
     if not client.get_connected():
@@ -78,7 +78,7 @@ def main():
 
     client.disconnect()
     client.destroy()
-    banner("Done. Check conpot.log on the VM for the logged S7 requests.")
+    banner("Done. Check the container log (docker logs conpot) for the logged S7 requests.")
 
 
 if __name__ == "__main__":
