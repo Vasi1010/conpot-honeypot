@@ -4,5 +4,6 @@
 #   pip install -r requirements.txt
 pandas>=2.0
 matplotlib>=3.8
+streamlit>=1.37   # st.fragment(run_every=...) for auto-refresh
 tzdata>=2024.1   # IANA zones (Asia/Kolkata) on Windows
 pytest>=8.0

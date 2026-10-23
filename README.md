@@ -33,6 +33,9 @@ conpot-honeypot/
 ├── analysis/
 │   ├── detection.py       # Low/Medium/High risk per source IP
 │   └── charts.py          # report/PPT charts (PNG) + CSV export
+├── dashboard/
+│   ├── app.py             # Streamlit live dashboard
+│   └── data.py            # log -> snapshot (KPIs, risk, gateway share)
 └── tests/                 # pytest suite
 ```
 
@@ -104,6 +107,26 @@ Writes 16:9 PNGs (200 dpi, slide-ready) and the tables to `output/` (git-ignored
 | `top_source_ips.png` | busiest source IPs, coloured and labelled by risk level |
 | `parsed_events.csv` | the full parsed table |
 | `risk_by_ip.csv` | the detection table |
+
+### Live dashboard (for the demo)
+
+```bash
+.venv\Scripts\Activate.ps1
+streamlit run dashboard/app.py          # opens http://localhost:8501
+```
+
+- **Log source:** the sidebar takes a file path (default `logs/conpot.log`, or set the
+  `CONPOT_LOG` environment variable) or an uploaded file.
+- **Live view:** it re-reads the file every few seconds (adjustable, or pause it), so
+  copying a fresh `conpot.log` into `logs/` updates the page within seconds. For a live
+  feed from the VM, keep overwriting that file, e.g. `docker logs conpot > logs/conpot.log`.
+- **What it shows:** KPI cards (total events, unique IPs, write attempts, High-risk IPs),
+  the four report charts, the risk-per-IP table, and the latest events.
+- **Warnings:** a red alert lists the IPs that attempted writes. A yellow warning appears
+  when more than half the traffic comes from a Docker gateway IP (`172.17.0.1`), which
+  means Docker NAT is hiding the real attackers; run Conpot with `--network host`.
+- **Bad input:** a missing, empty or garbled log shows a waiting/empty state instead of
+  crashing.
 
 ## Port map (VM)
 

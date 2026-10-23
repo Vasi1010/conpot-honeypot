@@ -73,6 +73,11 @@ def parse_log(path, tz=DEFAULT_TZ, stats=None):
     except OSError:
         stats.file_missing = True
         return _to_frame([], tz)
+    return parse_bytes(data, tz, stats)
+
+
+def parse_bytes(data, tz=DEFAULT_TZ, stats=None):
+    """Parse raw log bytes (e.g. an uploaded file); handles UTF-8/UTF-16 and BOMs."""
     return parse_lines(_decode(data).splitlines(), tz, stats)
 
 
