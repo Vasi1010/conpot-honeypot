@@ -26,7 +26,7 @@ Edit VM_IP below, then:  python s7_read.py
 # ---------------------------------------------------------------------------
 # CONFIG — change this to your VM's IP address
 # ---------------------------------------------------------------------------
-VM_IP = "192.168.1.50"    # <-- CHANGE ME
+VM_IP = "127.0.0.1"       # NAT port-forward: attack localhost on the laptop
 PORT = 102                # VM host port mapped to Conpot's S7comm (container 10201)
 RACK = 0                  # S7 rack number (0 is standard)
 SLOT = 2                  # S7 slot number (2 is typical for S7-300; try 1 if needed)

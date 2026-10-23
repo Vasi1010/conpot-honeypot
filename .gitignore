@@ -19,3 +19,4 @@ snap7.dll
 # (Delete this rule if you WANT to commit the handoff conpot.log.)
 logs/*.log
 !logs/.gitkeep
+!logs/conpot.log

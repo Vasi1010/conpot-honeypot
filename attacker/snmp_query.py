@@ -30,7 +30,7 @@ Edit VM_IP below, then:  python snmp_query.py
 # ---------------------------------------------------------------------------
 # CONFIG — change this to your VM's IP address
 # ---------------------------------------------------------------------------
-VM_IP = "192.168.1.50"    # <-- CHANGE ME
+VM_IP = "127.0.0.1"       # NAT port-forward: attack localhost on the laptop
 PORT = 161                # VM host port mapped to Conpot's SNMP (container 16100/udp)
 COMMUNITY = "public"      # Conpot default read community
 TIMEOUT = 3               # seconds
