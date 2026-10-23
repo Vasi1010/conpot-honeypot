@@ -93,3 +93,13 @@ def test_utf16_file_from_powershell_redirect(tmp_path):
     log = tmp_path / "conpot.log"
     log.write_text(f"2026-10-21 10:23:10,829 {WRITE}\r\n", encoding="utf-16")
     assert parse_log(log).iloc[0]["action"] == "write"
+
+
+@pytest.mark.parametrize("method, path, action", [
+    ("GET", "/", "scan"), ("GET", "/index.html", "scan"), ("HEAD", "/", "scan"),
+    ("GET", "/config.xml", "read"), ("POST", "/index.html", "write"),
+])
+def test_http_classification(method, path, action):
+    df = parse_lines([f"2026-10-21 10:40:18,395 HTTP/1.1 {method} request from ('1.2.3.4', 52011): "
+                      f"('{path}', [('Host', '192.168.1.50')], None). 16ac4191-a26a-40ae-844f-1574f037afc6"])
+    assert (df.iloc[0]["action"], df.iloc[0]["details"]) == (action, f"path={path}")
