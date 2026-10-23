@@ -6,12 +6,12 @@
 # Modbus/TCP client — pinned to the version the project targets
 pymodbus==3.6.9
 
-# SNMP client. pysnmp has historically been finicky on Windows/newer Python.
-# If it misbehaves at runtime, use the Net-SNMP `snmpwalk`/`snmpget` CLI instead
-# (see comments in snmp_query.py). The classic 4.4.x line below is the most
-# widely-compatible with the sync hlapi API used in snmp_query.py.
-pysnmp==4.4.12
-pyasn1==0.4.8
+# SNMP client — modern pysnmp (async API). Works on Python 3.11/3.12/3.13.
+# NOTE: the old pysnmp 4.4.x does NOT work on Python 3.12+ (it imports the
+# removed 'imp' module), so do not pin back to it. If pysnmp ever misbehaves,
+# the Net-SNMP `snmpwalk`/`snmpget` CLI is the no-Python fallback (see
+# snmp_query.py). pyasn1 is pulled in automatically at a compatible version.
+pysnmp==7.1.30
 
 # OPTIONAL — S7comm client. Needs the native snap7 library (snap7.dll) present
 # on Windows; see the heads-up in s7_read.py. Comment this out if you skip S7.

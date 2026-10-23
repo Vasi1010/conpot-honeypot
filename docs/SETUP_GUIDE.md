@@ -18,6 +18,25 @@ ports to the laptop. So from the laptop you always attack **`127.0.0.1`**.
 
 ---
 
+## What to download / install (shopping list)
+
+| Where | Software | How to get it | Needed? |
+|-------|----------|---------------|---------|
+| VM host PC | **VirtualBox + an Ubuntu VM** | <https://www.virtualbox.org/wiki/Downloads> + Ubuntu ISO | You already have this (the VM runs). |
+| Inside the VM | **Docker** | `sudo apt install docker.io` (Part A) | Yes |
+| Inside the VM | **Conpot image** | `sudo docker pull honeynet/conpot` (Part B) | Yes |
+| Windows laptop | **Python 3.x** | <https://www.python.org/downloads/> (tick "Add to PATH") | Already installed (3.13). |
+| Windows laptop | **Probe deps** (pymodbus, pysnmp) | `pip install -r requirements.txt` (Part E) | Yes |
+| Windows laptop | **Nmap** (optional, for verifying) | <https://nmap.org/download.html> | Optional |
+| Windows laptop | **snap7.dll** (optional, only for S7) | <https://sourceforge.net/projects/snap7/files/> | Optional |
+| Windows laptop | **Net-SNMP** (only if pysnmp fails) | <https://sourceforge.net/projects/net-snmp/files/> | Fallback only |
+
+Nothing here needs a specific old version. The one trap we already hit and fixed:
+the SNMP library **must be the modern pysnmp** (`requirements.txt` pins 7.x) —
+the old pysnmp 4.4 is broken on Python 3.12+.
+
+---
+
 ## Part A — Install Docker in the VM
 
 1. 🐧 **[VM]** Update the package list:
@@ -94,6 +113,13 @@ ports to the laptop. So from the laptop you always attack **`127.0.0.1`**.
 ## Part C — Port-forward the VM in VirtualBox
 
 Do this once. The VM can stay running (NAT rules apply live).
+
+> ⚠️ **This NAT + `127.0.0.1` approach only works if the VM runs on the SAME
+> computer you attack from.** If your VirtualBox VM is on a *different* machine,
+> NAT port-forwarding won't reach it. Instead: VM **Settings → Network →
+> Adapter 1 → Attached to: Bridged Adapter** (pick the Wi-Fi/Ethernet NIC),
+> start the VM, run `hostname -I` to get its LAN IP (e.g. `192.168.10.x`), and
+> set `VM_IP` in the scripts to that address. Skip the rest of Part C.
 
 10. 🖱️ **[VirtualBox]** Manager → select the VM → **Settings → Network →
     Adapter 1** (leave **Attached to: NAT**) → expand **Advanced** →
@@ -177,7 +203,8 @@ The scripts already target `127.0.0.1` (the NAT-forwarded ports). Keep the VM's
     ```powershell
     python snmp_query.py
     ```
-    > If pysnmp throws import/asyncio errors, use Net-SNMP instead:
+    > Uses the modern pysnmp (async) — already verified to load on Python 3.13.
+    > If it ever misbehaves, the no-Python fallback is Net-SNMP:
     > `snmpwalk -v2c -c public 127.0.0.1 1.3.6.1.2.1.1`
 
 21. 🪟 **[Laptop]** *(Optional)* S7comm identification read:
@@ -236,6 +263,6 @@ The scripts already target `127.0.0.1` (the NAT-forwarded ports). Keep the VM's
 | T4 | Ports show `127.0.0.1:80->8800` in `docker ps` | Docker published to loopback only. Re-run step 6 exactly (the `-p 80:8800` form publishes on `0.0.0.0`). |
 | T5 | `docker: permission denied` | You dropped the `sudo`. Use `sudo docker ...`. |
 | T6 | SNMP returns nothing | Wrong community or template. Confirm `public`; try `snmpwalk -v2c -c public 127.0.0.1 1.3.6.1.2.1.1`. |
-| T7 | `pip install` fails on pysnmp | See `snmp_query.py` — fall back to the `snmpwalk` CLI; it needs no Python packages. |
+| T7 | SNMP errors / `No module named 'imp'` | You have the OLD pysnmp 4.4 (dead on Python 3.12+). Fix: `pip uninstall -y pysnmp && pip install "pysnmp==7.1.30"`. Last resort: the `snmpwalk` CLI. |
 | T8 | S7 script: "can't find snap7 library" | Put `snap7.dll` on PATH (next to the script or in `System32`). S7 is optional. |
 | T9 | Pulled image is very old / won't start | Build from source instead: `git clone https://github.com/mushorg/conpot.git` then `cd conpot && sudo make build-docker && sudo make run-docker`. |

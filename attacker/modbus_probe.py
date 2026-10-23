@@ -18,7 +18,7 @@ Edit VM_IP below, then:  python modbus_probe.py
 # ---------------------------------------------------------------------------
 # CONFIG — change this to your VM's IP address (e.g. the VirtualBox bridged IP)
 # ---------------------------------------------------------------------------
-VM_IP = "127.0.0.1"      # NAT port-forward: attack localhost on the laptop
+VM_IP = "127.0.0.1"      # 127.0.0.1 if NAT port-forwarding on this PC; else the VM's LAN IP
 PORT = 502               # VM host port mapped to Conpot's Modbus (container 5020)
 SLAVE = 1                # Modbus unit id Conpot answers on
 TIMEOUT = 5              # seconds
