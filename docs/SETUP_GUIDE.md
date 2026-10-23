@@ -94,13 +94,16 @@ the old pysnmp 4.4 is broken on Python 3.12+.
    internal ports (8800/10201/5020/16100) to the VM's standard ICS ports
    (80/102/502/161):
    ```bash
-   sudo docker run -d --name conpot \
+   sudo docker run -d --name conpot --restart unless-stopped \
      -p 80:8800 \
      -p 102:10201 \
      -p 502:5020 \
      -p 161:16100/udp \
      honeynet/conpot
    ```
+   > `--restart unless-stopped` makes Docker bring the container back up
+   > automatically after a VM reboot, so you don't have to re-run it each time.
+   > (Omit the flag if you'd rather start it manually with `sudo docker start conpot`.)
    | VM (host) port | Container port | Service |
    |----------------|----------------|---------|
    | 80             | 8800           | HTTP    |
