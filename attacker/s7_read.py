@@ -12,12 +12,10 @@ Target  : Conpot S7comm service, exposed on the VM at TCP/102
 Library  : python-snap7
 
 ----------------------------------------------------------------------------
-HEADS-UP (Windows): python-snap7 needs the native snap7 library (snap7.dll).
-If you get "can't find snap7 library" at runtime:
-  - pip may ship the DLL with recent python-snap7 wheels; if not, download the
-    snap7 binaries and put snap7.dll somewhere on your PATH (e.g. next to this
-    script or in C:\\Windows\\System32). The SETUP_GUIDE covers this.
-Because of that DLL dependency this script is marked OPTIONAL in the project.
+NOTE (Windows): the modern python-snap7 wheel (we use 3.3.0) BUNDLES the native
+snap7 library, so `pip install python-snap7` is all you need — no manual
+snap7.dll to download or place on PATH. Verified to import on Python 3.13.
+This script is still marked OPTIONAL because S7 is a bonus probe for the project.
 ----------------------------------------------------------------------------
 
 Edit VM_IP below, then:  python s7_read.py
@@ -26,7 +24,7 @@ Edit VM_IP below, then:  python s7_read.py
 # ---------------------------------------------------------------------------
 # CONFIG — change this to your VM's IP address
 # ---------------------------------------------------------------------------
-VM_IP = "192.168.1.50"    # <-- CHANGE ME
+VM_IP = "127.0.0.1"       # 127.0.0.1 if NAT port-forwarding on this PC; else the VM's LAN IP
 PORT = 102                # VM host port mapped to Conpot's S7comm (container 10201)
 RACK = 0                  # S7 rack number (0 is standard)
 SLOT = 2                  # S7 slot number (2 is typical for S7-300; try 1 if needed)

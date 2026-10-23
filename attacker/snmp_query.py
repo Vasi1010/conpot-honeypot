@@ -7,30 +7,34 @@ answers standard system OIDs with Siemens-like identity strings. This script
 issues an SNMP GET for a few well-known OIDs and then a WALK of the system
 subtree, so the honeypot logs the queries.
 
-Target   : Conpot SNMP service, exposed on the VM at UDP/161
-Community : public   (read-only, Conpot default)
-Version   : SNMP v2c
-Library   : pysnmp  (classic hlapi sync API)
+Target    : Conpot SNMP service, reachable on <VM_IP>:161/udp
+Community  : public   (read-only, Conpot default)
+Version    : SNMP v2c
+Library    : pysnmp 7.x  (modern async API — works on Python 3.11/3.12/3.13)
 
 ----------------------------------------------------------------------------
-pysnmp can be fiddly to install on Windows/newer Python. If `pip install pysnmp`
-gives you import or asyncio errors at runtime, DON'T fight it — just use the
-snmpwalk command-line tool instead (Net-SNMP). Equivalent commands:
+pysnmp 7.x is async, so this script is written with asyncio. You do NOT need to
+understand asyncio to run it — just `python snmp_query.py`.
+
+If pysnmp ever gives you trouble, the Net-SNMP command-line tools do the same
+thing without any Python at all:
 
     snmpget  -v2c -c public <VM_IP> 1.3.6.1.2.1.1.1.0
     snmpwalk -v2c -c public <VM_IP> 1.3.6.1.2.1.1
 
-On Windows you can get snmpwalk from the Net-SNMP binaries; on the Ubuntu VM
-it's `sudo apt install snmp`. The SETUP_GUIDE documents both paths.
+(Windows Net-SNMP binaries: https://sourceforge.net/projects/net-snmp/ ;
+ on the Ubuntu VM it's `sudo apt install snmp`.)
 ----------------------------------------------------------------------------
 
 Edit VM_IP below, then:  python snmp_query.py
 """
 
 # ---------------------------------------------------------------------------
-# CONFIG — change this to your VM's IP address
+# CONFIG — set this to the address where the honeypot is reachable FROM THIS PC:
+#   * "127.0.0.1"     if you used VirtualBox NAT port-forwarding on THIS machine
+#   * the VM's LAN IP  (e.g. 192.168.10.x) if the VM uses a Bridged adapter
 # ---------------------------------------------------------------------------
-VM_IP = "192.168.1.50"    # <-- CHANGE ME
+VM_IP = "127.0.0.1"       # <-- change if your VM is reached by a LAN IP
 PORT = 161                # VM host port mapped to Conpot's SNMP (container 16100/udp)
 COMMUNITY = "public"      # Conpot default read community
 TIMEOUT = 3               # seconds
@@ -47,10 +51,18 @@ OIDS_TO_GET = {
 SYSTEM_SUBTREE = "1.3.6.1.2.1.1"   # walk the whole 'system' group
 
 # ---------------------------------------------------------------------------
-from pysnmp.hlapi import (
+import asyncio
+import sys
+
+from pysnmp.hlapi.v3arch.asyncio import (
     SnmpEngine, CommunityData, UdpTransportTarget, ContextData,
-    ObjectType, ObjectIdentity, getCmd, nextCmd,
+    ObjectType, ObjectIdentity, get_cmd, walk_cmd,
 )
+
+# On Windows, use the selector event loop — it's the most reliable for the UDP
+# sockets SNMP relies on.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 def banner(text):
@@ -59,16 +71,22 @@ def banner(text):
     print("=" * 60)
 
 
-def snmp_get(oid):
-    """Issue a single SNMP GET for one OID; return the value as a string."""
-    iterator = getCmd(
-        SnmpEngine(),
-        CommunityData(COMMUNITY, mpModel=1),              # mpModel=1 => SNMP v2c
-        UdpTransportTarget((VM_IP, PORT), timeout=TIMEOUT, retries=RETRIES),
-        ContextData(),
+def _community():
+    # mpModel=1 selects SNMP v2c (mpModel=0 would be v1).
+    return CommunityData(COMMUNITY, mpModel=1)
+
+
+async def _target():
+    # UdpTransportTarget.create(...) is a coroutine in pysnmp 7.x.
+    return await UdpTransportTarget.create((VM_IP, PORT), timeout=TIMEOUT, retries=RETRIES)
+
+
+async def snmp_get(engine, oid):
+    """Issue a single SNMP GET for one OID; return 'OID = value' as a string."""
+    errorIndication, errorStatus, errorIndex, varBinds = await get_cmd(
+        engine, _community(), await _target(), ContextData(),
         ObjectType(ObjectIdentity(oid)),
     )
-    errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
     if errorIndication:
         return f"ERROR: {errorIndication}"
     if errorStatus:
@@ -76,40 +94,41 @@ def snmp_get(oid):
     return " = ".join(x.prettyPrint() for x in varBinds[0])
 
 
-def snmp_walk(subtree):
-    """Walk an OID subtree, yielding 'OID = value' strings."""
-    for (errorIndication, errorStatus, errorIndex, varBinds) in nextCmd(
-        SnmpEngine(),
-        CommunityData(COMMUNITY, mpModel=1),
-        UdpTransportTarget((VM_IP, PORT), timeout=TIMEOUT, retries=RETRIES),
-        ContextData(),
+async def snmp_walk(engine, subtree):
+    """Walk an OID subtree, printing each 'OID = value' it returns."""
+    found = False
+    async for (errorIndication, errorStatus, errorIndex, varBinds) in walk_cmd(
+        engine, _community(), await _target(), ContextData(),
         ObjectType(ObjectIdentity(subtree)),
         lexicographicMode=False,   # stop at the end of the subtree
     ):
         if errorIndication:
-            yield f"ERROR: {errorIndication}"
+            print(f"  ERROR: {errorIndication}")
             return
         if errorStatus:
-            yield f"ERROR: {errorStatus.prettyPrint()}"
+            print(f"  ERROR: {errorStatus.prettyPrint()}")
             return
         for varBind in varBinds:
-            yield " = ".join(x.prettyPrint() for x in varBind)
+            found = True
+            print("  " + " = ".join(x.prettyPrint() for x in varBind))
+    if not found:
+        print("  (no response — check community string / that SNMP is UDP-forwarded)")
 
 
-def main():
+async def main():
     banner(f"SNMP v2c probe  ->  {VM_IP}:{PORT}  (community='{COMMUNITY}')")
+    engine = SnmpEngine()
 
     print("[*] SNMP GET on well-known system OIDs:\n")
     for oid, label in OIDS_TO_GET.items():
         print(f"  {label}")
-        print(f"    {snmp_get(oid)}\n")
+        print(f"    {await snmp_get(engine, oid)}\n")
 
     banner(f"SNMP WALK of system subtree {SYSTEM_SUBTREE}")
-    for line in snmp_walk(SYSTEM_SUBTREE):
-        print(f"  {line}")
+    await snmp_walk(engine, SYSTEM_SUBTREE)
 
     banner("Done. Check conpot.log on the VM for the logged SNMP requests.")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
