@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Native libs that may get dropped next to the S7 script
+snap7.dll
+*.so
+
+# Keep the logs/ folder but ignore stray local captures by default.
+# (Delete this rule if you WANT to commit the handoff conpot.log.)
+logs/*.log
+!logs/.gitkeep
