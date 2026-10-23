@@ -19,3 +19,7 @@ snap7.dll
 # (Delete this rule if you WANT to commit the handoff conpot.log.)
 logs/*.log
 !logs/.gitkeep
+
+# Analysis outputs (charts, parsed CSVs) and test cache
+output/
+.pytest_cache/
