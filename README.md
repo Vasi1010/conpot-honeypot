@@ -23,8 +23,46 @@ conpot-honeypot/
 │   └── requirements.txt
 ├── docs/
 │   └── SETUP_GUIDE.md     # numbered, copy-paste setup guide (for the viva)
-└── logs/                  # drop the captured conpot.log here to hand off
+├── logs/                  # drop the captured conpot.log here to hand off
+│
+├── parser/                # analysis: conpot.log -> pandas DataFrame
+│   ├── patterns.py        #   line shapes (edit this if real lines don't match)
+│   ├── formats.py         #   pluggable formats: TextFormat (regex), JsonFormat
+│   ├── classify.py        #   function codes -> request type + scan/read/write
+│   └── conpot_parser.py   #   parse_log() + CLI
+└── tests/                 # pytest suite
 ```
+
+## Analysis side
+
+```bash
+py -3 -m venv .venv
+.venv\Scripts\Activate.ps1          # or .venv\Scripts\activate.bat in cmd
+pip install -r requirements.txt
+
+python -m parser logs/conpot.log --csv output/parsed.csv   # summary + parsed table
+python -m parser logs/conpot.log --tz UTC                  # if the VM logs in UTC
+pytest
+```
+
+```python
+from parser import ParseStats, parse_log
+stats = ParseStats()
+df = parse_log("logs/conpot.log", tz="Asia/Kolkata", stats=stats)
+```
+
+Each row is one attacker event: `timestamp, src_ip, src_port, protocol, event,
+request_type, function_code, action, details, is_private, is_docker_gateway,
+session_id, pattern, raw`. `action` is `scan`, `read`, `write`, `connect` or
+`other` (rules in `parser/classify.py`). `is_docker_gateway` marks 172.17.0.1-style
+sources, where Docker NAT hid the real attacker IP.
+
+Input can be `conpot.log`, `docker logs [-t] conpot` output (also when saved as
+UTF-16 by PowerShell) or Conpot's JSON log. Timestamps without a timezone are read
+as `--tz` (default `Asia/Kolkata`). A missing or empty file gives an empty table.
+Unparseable lines are skipped and counted, and lines that only partly match but
+contain an IP are kept as `pattern == "fallback"` rows. The CLI lists both kinds,
+so if the real log has any, adjust `parser/patterns.py`.
 
 ## Port map (VM)
 

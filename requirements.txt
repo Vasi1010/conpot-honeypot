@@ -1,0 +1,7 @@
+# Analysis side (parser, charts, dashboard). Python 3.10+.
+#   py -3 -m venv .venv
+#   .venv\Scripts\Activate.ps1
+#   pip install -r requirements.txt
+pandas>=2.0
+tzdata>=2024.1   # IANA zones (Asia/Kolkata) on Windows
+pytest>=8.0
