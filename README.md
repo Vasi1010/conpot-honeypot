@@ -26,10 +26,12 @@ conpot-honeypot/
 ├── Dockerfile             # builds conpot-ics:latest = honeynet/conpot + custom template
 ├── conpot_template/       # custom Conpot template (slave 1 returns real Modbus data)
 ├── attacker/              # probe scripts, run locally against 127.0.0.1
-│   ├── attack.py          # one-shot combined attack (modbus -> snmp -> s7comm)
+│   ├── attack.py          # one-shot combined attack (modbus→snmp→s7comm→ftp→bacnet)
 │   ├── modbus_probe.py    # Modbus reads + a write (pymodbus 3.6.9, slave=1)
 │   ├── snmp_query.py      # SNMP GET/WALK (pysnmp, with snmpwalk fallback in comments)
 │   ├── s7_read.py         # optional S7comm identification read (python-snap7)
+│   ├── ftp_probe.py       # FTP control-session probe (ftplib, stdlib)
+│   ├── bacnet_probe.py    # BACnet/IP Who-Is probe (socket, stdlib)
 │   └── requirements.txt
 ├── scripts/
 │   └── attack.py          # rich coloured attack console (Recon/Fingerprint/Read/Write)
@@ -153,6 +155,8 @@ streamlit run dashboard/app.py          # opens http://localhost:8501
 | S7comm  | 10201                 | 102         |
 | Modbus  | 5020                  | 502         |
 | SNMP    | 16100/udp             | 161/udp     |
+| FTP     | 2121                  | 2121        |
+| BACnet  | 47808/udp             | 47808/udp   |
 
 ## Quick start
 
@@ -161,7 +165,8 @@ streamlit run dashboard/app.py          # opens http://localhost:8501
 docker build -t conpot-ics:latest .
 docker run -d --name conpot --restart unless-stopped `
   -p 127.0.0.1:502:5020/tcp -p 127.0.0.1:102:10201/tcp `
-  -p 127.0.0.1:161:16100/udp -p 127.0.0.1:8080:8800/tcp conpot-ics:latest
+  -p 127.0.0.1:161:16100/udp -p 127.0.0.1:8080:8800/tcp `
+  -p 127.0.0.1:2121:2121/tcp -p 127.0.0.1:47808:47808/udp conpot-ics:latest
 
 # 2. attack it (scripts already target 127.0.0.1)
 cd attacker

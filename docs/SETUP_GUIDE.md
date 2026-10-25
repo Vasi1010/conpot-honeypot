@@ -83,6 +83,8 @@ pumping/water-treatment station — instead of `IllegalAddress`. Build the image
      -p 127.0.0.1:102:10201/tcp `
      -p 127.0.0.1:161:16100/udp `
      -p 127.0.0.1:8080:8800/tcp `
+     -p 127.0.0.1:2121:2121/tcp `
+     -p 127.0.0.1:47808:47808/udp `
      conpot-ics:latest
    ```
    | Laptop (127.0.0.1) port | Container port | Service |
@@ -91,6 +93,8 @@ pumping/water-treatment station — instead of `IllegalAddress`. Build the image
    | 102                     | 10201          | S7comm  |
    | 161/udp                 | 16100/udp      | SNMP    |
    | 8080                    | 8800           | HTTP    |
+   | 2121                    | 2121           | FTP     |
+   | 47808/udp               | 47808/udp      | BACnet  |
 
    > **Why 8080 for HTTP?** This laptop already has something on port 80 (another
    > project's container), so we map HTTP to **8080**. The probes don't use HTTP,
@@ -177,8 +181,8 @@ pumping/water-treatment station — instead of `IllegalAddress`. Build the image
 The scripts already target `127.0.0.1` (the published ports). Keep the
 `docker logs -f conpot` window visible so you can watch requests land.
 
-11. 🪟 **[Laptop]** **Easiest — all three at once** (waits for the honeypot, then
-    runs Modbus → SNMP → S7comm):
+11. 🪟 **[Laptop]** **Easiest — all five at once** (waits for the honeypot, then
+    runs Modbus → SNMP → S7comm → FTP → BACnet):
     ```powershell
     python attack.py
     ```
@@ -216,6 +220,14 @@ The scripts already target `127.0.0.1` (the published ports). Keep the
     > The session establishes and is logged; `get_cpu_info()` then erroring out is
     > a known Conpot/snap7 mismatch, not a failure. S7 is the bonus probe —
     > Modbus + SNMP already demonstrate the honeypot.
+
+    *Also available, run the same way* — more protocol breadth in the capture:
+    ```powershell
+    python ftp_probe.py       # FTP: anonymous control session (SYST/PWD/STAT/HELP)
+    python bacnet_probe.py    # BACnet/IP: a broadcast Who-Is
+    ```
+    > Both use only the Python standard library. They need the FTP (2121) and BACnet
+    > (47808/udp) ports published — already in the Part A run command.
 
 ---
 
