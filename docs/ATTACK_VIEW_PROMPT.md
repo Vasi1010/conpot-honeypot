@@ -10,10 +10,16 @@ block below into a Claude Code session opened in this repo, or follow it by hand
 
 ### Context
 This repo (`conpot-honeypot`) is a two-part uni project:
-- **Attacker half** (`attacker/`): Python probes (`attack.py` runs Modbus → SNMP → S7comm
-  against the honeypot).
+- **Attacker half**: there are now **two** attack scripts — `attacker/attack.py` (full
+  Modbus → SNMP → S7comm; imports the three probe scripts) and `scripts/attack.py` (a `rich`
+  coloured **terminal** console: Modbus FC43/FC3/FC6 + HTTP GET + TCP-connect recon, with a
+  loopback/private-LAN safety gate). Either generates the log traffic; the attack view reads the
+  **log**, not the attacker, so it works with whichever you demo.
 - **Analysis half** (`parser/`, `analysis/`, `dashboard/`): turns the honeypot's log into
   structured events, a per-IP risk score, charts, and a Streamlit dashboard.
+
+> Note: `scripts/attack.py` is a *terminal* console (coloured text), not a visual page — so
+> this attack view does **not** duplicate it; it's the missing graphical companion.
 
 The honeypot is **Conpot in Docker** (a fake Siemens SIMATIC S7-200 PLC) running on the same
 laptop; probes hit `127.0.0.1`. The log is captured with
@@ -29,6 +35,11 @@ replacement. Keep the dashboard as-is.
 - `dashboard/data.py` → `load(path=..., tz=..., window_s=...)` returns a `Snapshot` with:
   `.df` (one row per event), `.risk` (per-IP risk table), `.kpis`, `.gateway_share`,
   `.gateway_ips`, `.stats`, `.source`.
+- **Prefer the live Docker source:** `dashboard/data.py` also has
+  `load_docker(container="conpot", tz=..., window_s=...)` → a `Snapshot` built **live from
+  `docker logs conpot`**, so the view updates on its own with no manual log export. On failure it
+  returns an empty `Snapshot` with `.docker_error` set (never raises) — surface that string in the
+  UI. (Falling back to `load(path=...)` for a static/sample log is still fine for offline demos.)
 - Event rows (`snap.df`) have columns: `timestamp, src_ip, src_port, protocol, event,
   request_type, function_code, action, details, is_private, is_docker_gateway, session_id`.
   `action` is one of `scan | read | write | connect` — this is the key field for the visual.
@@ -53,8 +64,8 @@ replacement. Keep the dashboard as-is.
 ### Tech — pick one, your call
 - **Option A (recommended, fits the stack):** a new Streamlit page, e.g.
   `dashboard/attack_view.py`, run with `streamlit run dashboard/attack_view.py`. Use
-  `@st.fragment(run_every=1)` to poll `logs/conpot.log` each second (same pattern as
-  `app.py`), and render the map + ticker as inline HTML/SVG via
+  `@st.fragment(run_every=1)` to call `data.load_docker()` each second (live from the container;
+  same auto-refresh pattern as `app.py`), and render the map + ticker as inline HTML/SVG via
   `st.markdown(..., unsafe_allow_html=True)` with CSS keyframe animations triggered when new
   event IDs appear since the last run. Fastest to integrate.
 - **Option B (smoothest real-time):** a tiny `FastAPI`/`Flask` server that tails
@@ -79,12 +90,14 @@ Low `#157a4e`. This matches `dashboard/app.py` and `docs/` so the two views feel
 
 ### How to try it end to end
 1. `docker start conpot`
-2. `cd attacker ; .\.venv\Scripts\python.exe attack.py ; cd ..`
-3. `docker logs conpot > logs\conpot.log 2>&1`  (re-run to feed the page new events)
-4. `.\.venv\Scripts\python.exe -m streamlit run dashboard\attack_view.py`
+2. `.\.venv\Scripts\python.exe -m streamlit run dashboard\attack_view.py`  (uses `load_docker()`,
+   so it reads the container live — no manual log export needed)
+3. Run an attack and watch the page react:
+   `cd attacker ; .\.venv\Scripts\python.exe attack.py ; cd ..`
+   or the terminal console: `.\.venv\Scripts\python.exe scripts\attack.py --phase all`
 
 Also make it work on a static capture for a no-honeypot demo:
-`sample_logs/conpot_0.6.0_real.log` (set `CONPOT_LOG` or a sidebar path input).
+`sample_logs/conpot_0.6.0_real.log` via `load(path=...)` (a sidebar path input or `CONPOT_LOG`).
 
 ### Acceptance criteria
 - With the honeypot up and `attack.py` run, the page shows protocol lanes pulsing, events
