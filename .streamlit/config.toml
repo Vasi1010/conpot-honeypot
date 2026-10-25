@@ -2,4 +2,9 @@
 gatherUsageStats = false
 
 [theme]
-base = "light"   # matches the light PNG charts
+base = "light"              # matches the light PNG charts
+primaryColor = "#0e7490"    # cyan accent (matches the walkthrough page)
+backgroundColor = "#f4f7f9"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#17212e"
+font = "sans serif"
