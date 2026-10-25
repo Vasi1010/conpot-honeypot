@@ -16,9 +16,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root, fo
 
 import matplotlib.pyplot as plt  # noqa: E402
 import streamlit as st  # noqa: E402
+import streamlit.components.v1 as components  # noqa: E402
 
 from analysis import charts  # noqa: E402
 from analysis.detection import DEFAULT_WINDOW_S  # noqa: E402
+from dashboard import simulator  # noqa: E402
 from dashboard.data import DEFAULT_CONTAINER, DEFAULT_LOG, file_signature, load, load_docker  # noqa: E402
 from parser import DEFAULT_TZ  # noqa: E402
 
@@ -268,4 +270,100 @@ def dashboard():
     show_parse_stats(snap)
 
 
-dashboard()
+# --------------------------------------------------------------------------- Attack Simulator tab
+
+def show_attack_chain(chain):
+    """Three pills — Scan -> Read -> Write — lit for the stages reached."""
+    cols = st.columns([3, 1, 3, 1, 3])
+    pills = [("scan", "🔍 Scan"), ("read", "📖 Read"), ("write", "✍️ Write")]
+    for col, (stage, label) in zip((cols[0], cols[2], cols[4]), pills):
+        lit = chain[stage]
+        colour = simulator.COLOUR_WRITE if stage == "write" and lit else (
+            simulator.COLOUR_BUSY if lit else "#3a4553")
+        fg = "#0d1117" if lit else "#8b98a9"
+        col.markdown(
+            f"<div style='background:{colour};color:{fg};border-radius:8px;"
+            f"padding:10px 4px;text-align:center;font-weight:700;font-family:monospace'>"
+            f"{label}</div>", unsafe_allow_html=True)
+    for arrow_col in (cols[1], cols[3]):
+        arrow_col.markdown("<div style='text-align:center;font-size:22px;"
+                           "padding-top:6px;color:#8b98a9'>→</div>", unsafe_allow_html=True)
+
+
+def show_plc_card(state_key):
+    colour, label = simulator.PLC_STATES[state_key]
+    st.markdown(
+        f"<div style='background:{colour};border-radius:10px;padding:16px;text-align:center;"
+        f"color:#0d1117'><div style='font-size:12px;letter-spacing:2px'>PLC STATUS</div>"
+        f"<div style='font-size:20px;font-weight:800;margin-top:4px'>{label}</div></div>",
+        unsafe_allow_html=True)
+
+
+def stream_attack(target, phase):
+    """Run the attack console and stream its output into a terminal-style panel."""
+    panel = st.empty()
+    lines = []
+    with st.spinner(f"Running **{phase}** against `{target}` ..."):
+        for line in simulator.iter_attack_output(target, phase):
+            lines.append(line)
+            panel.code("\n".join(lines[-400:]) or " ", language=None)
+    st.session_state["sim_output"] = "\n".join(lines)
+
+
+def simulator_tab():
+    st.subheader("Attack Simulator")
+    st.caption("Drive labelled traffic at the lab honeypot and watch the attack chain light up. "
+               "Targets are restricted to loopback / private-LAN addresses.")
+
+    target = st.text_input("Attack target", value="127.0.0.1", key="sim_target",
+                           help="Loopback or private-LAN only — the attack console refuses anything else.")
+
+    cols = st.columns(len(simulator.PHASES))
+    clicked = None
+    for col, (label, phase) in zip(cols, simulator.PHASES.items()):
+        kind = "primary" if label == "Full Attack" else "secondary"
+        if col.button(label, key=f"sim_btn_{phase}", width="stretch", type=kind):
+            clicked = phase
+    if clicked:
+        stream_attack(target.strip() or "127.0.0.1", clicked)
+    elif st.session_state.get("sim_output"):
+        st.code(st.session_state["sim_output"][-6000:], language=None)
+
+    # Read the (now-updated) log and visualise the chain for one IP.
+    snap = get_snapshot()
+    st.divider()
+    if snap is None or snap.df.empty:
+        st.info("Run an attack above (with a live honeypot source) to populate the attack chain.")
+        return
+
+    ips = list(snap.risk["src_ip"])
+    default = simulator.writers(snap.risk) or ips
+    chosen = st.selectbox("Source IP to track", ips,
+                          index=ips.index(default[0]) if default else 0, key="sim_ip")
+
+    chain = simulator.chain_status(snap.risk, chosen)
+    state = simulator.plc_state(snap.risk, chosen)
+    colour = simulator.stage_colour(snap.risk, chosen)
+
+    left, right = st.columns([2, 1])
+    with left:
+        st.markdown("**Attack chain**")
+        show_attack_chain(chain)
+        st.markdown("**Network view**")
+        components.html(simulator.network_svg(colour, attacker_label=chosen), height=130)
+    with right:
+        show_plc_card(state)
+
+    # Toast when a brand-new write attempt shows up since the last run.
+    current = simulator.writers(snap.risk)
+    fresh = simulator.new_writers(current, st.session_state.get("sim_prev_writers", []))
+    for ip in fresh:
+        st.toast(f"🚨 New WRITE attempt from {ip}", icon="🚨")
+    st.session_state["sim_prev_writers"] = current
+
+
+tab_dashboard, tab_simulator = st.tabs(["📊 Dashboard", "🎯 Attack Simulator"])
+with tab_dashboard:
+    dashboard()
+with tab_simulator:
+    simulator_tab()
