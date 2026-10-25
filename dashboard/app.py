@@ -19,7 +19,7 @@ import streamlit as st  # noqa: E402
 
 from analysis import charts  # noqa: E402
 from analysis.detection import DEFAULT_WINDOW_S  # noqa: E402
-from dashboard.data import DEFAULT_LOG, file_signature, load  # noqa: E402
+from dashboard.data import DEFAULT_CONTAINER, DEFAULT_LOG, file_signature, load, load_docker  # noqa: E402
 from parser import DEFAULT_TZ  # noqa: E402
 
 st.set_page_config(page_title="Conpot honeypot dashboard", page_icon="🛡️", layout="wide")
@@ -40,14 +40,17 @@ def load_upload(data, name, tz, window_s):
 
 with st.sidebar:
     st.header("Log source")
-    mode = st.radio("Source", ["File path", "Upload"], horizontal=True, label_visibility="collapsed")
+    mode = st.radio("Source", ["File path", "Upload", "Live from Docker"],
+                    label_visibility="collapsed")
+    path = upload = container = None
     if mode == "File path":
         path = st.text_input("Log file path", value=os.environ.get("CONPOT_LOG", DEFAULT_LOG), key="path",
                              help="conpot.log, `docker logs conpot` output, or a JSON log")
-        upload = None
-    else:
-        path = None
+    elif mode == "Upload":
         upload = st.file_uploader("Upload a log file", type=None, key="upload")
+    else:
+        container = st.text_input("Container name", value=DEFAULT_CONTAINER, key="container",
+                                  help="Runs `docker logs <name>` on every refresh — no manual export needed.")
 
     st.header("Refresh")
     live = st.toggle("Auto-refresh", value=True, key="live")
@@ -67,6 +70,9 @@ def get_snapshot():
     try:
         if upload is not None:
             return load_upload(upload.getvalue(), upload.name, tz, window_s)
+        if container is not None:
+            # Not cached: we want a fresh `docker logs` read on every refresh.
+            return load_docker(container.strip() or DEFAULT_CONTAINER, tz, window_s)
         if path is not None:
             return load_path(path, file_signature(path), tz, window_s)
     except Exception as exc:  # e.g. an unknown timezone typed in the sidebar
@@ -125,6 +131,11 @@ def dashboard():
     if snap is None:
         if mode == "Upload":
             st.info("Upload a Conpot log to start.")
+        return
+    if snap.docker_error:
+        st.warning(f"Live Docker source unavailable: {snap.docker_error}  "
+                   "Start the honeypot container (e.g. `docker start conpot`) or switch to a "
+                   "file/upload source in the sidebar.", icon="🐳")
         return
     if snap.stats.file_missing:
         st.warning(f"Waiting for the log file: `{snap.source}`. "
