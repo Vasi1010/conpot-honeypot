@@ -10,6 +10,7 @@
 #   docker run -d --name conpot --restart unless-stopped \
 #     -p 127.0.0.1:502:5020/tcp -p 127.0.0.1:102:10201/tcp \
 #     -p 127.0.0.1:161:16100/udp -p 127.0.0.1:8080:8800/tcp \
+#     -p 127.0.0.1:2121:2121/tcp -p 127.0.0.1:47808:47808/udp \
 #     conpot-ics:latest
 #
 # Our template intentionally omits the stock ssl/ dir (an unused HTTPS/proxy

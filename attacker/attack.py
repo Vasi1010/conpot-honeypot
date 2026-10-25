@@ -2,16 +2,17 @@
 """
 attack.py  —  one-shot combined attack against our Conpot honeypot.
 
-Runs all three probes back-to-back, the same sequence we demo live:
+Runs all five probes back-to-back, the same sequence we demo live:
 
-    Modbus  ->  SNMP  ->  S7comm        (connect, scan, read, write)
+    Modbus -> SNMP -> S7comm -> FTP -> BACnet   (connect, scan, read, write)
 
 Conpot logs every request, and the analysis side then scores this source as
 *High* risk (scan -> read -> write across multiple protocols).
 
 This is a convenience wrapper: it imports and calls the existing probe scripts
-(modbus_probe.py, snmp_query.py, s7_read.py), so there is no duplicated logic —
-edit the target/ports in those files and this follows along.
+(modbus_probe.py, snmp_query.py, s7_read.py, ftp_probe.py, bacnet_probe.py), so
+there is no duplicated logic — edit the target/ports in those files and this
+follows along.
 
 Run it from the attacker/ folder with the venv active:
 
@@ -30,6 +31,8 @@ import time
 import modbus_probe
 import snmp_query
 import s7_read
+import ftp_probe
+import bacnet_probe
 
 # Stay in sync with the Modbus probe's target so there is one source of truth.
 HOST = modbus_probe.VM_IP
@@ -67,7 +70,7 @@ def run_step(label, func):
 def main():
     rule()
     print(f"  COMBINED ICS HONEYPOT ATTACK  ->  {HOST}")
-    print("  Modbus  +  SNMP  +  S7comm     (scan -> read -> write)")
+    print("  Modbus + SNMP + S7comm + FTP + BACnet   (scan -> read -> write)")
     rule()
 
     if not wait_for_honeypot(HOST, READY_PORT, READY_TIMEOUT):
@@ -79,13 +82,15 @@ def main():
     # seconds behind the open port, so give them a moment before we hit Modbus.
     time.sleep(WARMUP_GRACE)
 
-    run_step("[1/3] MODBUS", modbus_probe.main)
-    run_step("[2/3] SNMP", lambda: asyncio.run(snmp_query.main()))
-    run_step("[3/3] S7comm", s7_read.main)
+    run_step("[1/5] MODBUS", modbus_probe.main)
+    run_step("[2/5] SNMP", lambda: asyncio.run(snmp_query.main()))
+    run_step("[3/5] S7comm", s7_read.main)
+    run_step("[4/5] FTP", ftp_probe.main)
+    run_step("[5/5] BACnet", bacnet_probe.main)
 
     rule()
     print("  ATTACK COMPLETE.")
-    print("  Scanned, read and wrote across 3 protocols -> scored High risk.")
+    print("  Scanned, read and wrote across 5 protocols -> scored High risk.")
     print("  Capture the log:  docker logs conpot > ../logs/conpot.log 2>&1")
     rule()
     return 0

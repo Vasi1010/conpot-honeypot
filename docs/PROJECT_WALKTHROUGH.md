@@ -57,10 +57,12 @@ honeypot/
 ├─ conpot_template/          ← custom Conpot template: slave 1 returns REAL Modbus data
 │
 ├─ attacker/                 ← HALF 1: the attack scripts (own venv)
-│  ├─ attack.py              ← one-shot COMBINED attack: runs all 3 probes in order
+│  ├─ attack.py              ← one-shot COMBINED attack: runs all 5 probes in order
 │  ├─ modbus_probe.py        ← Modbus/TCP: reads coils/registers, then a WRITE
 │  ├─ snmp_query.py          ← SNMP v2c: GET + WALK the system tree (the "identity")
 │  ├─ s7_read.py             ← S7comm: connect + identification read (optional/bonus)
+│  ├─ ftp_probe.py           ← FTP: anonymous control session (SYST/PWD/STAT/HELP)
+│  ├─ bacnet_probe.py        ← BACnet/IP: a broadcast Who-Is (building-automation recon)
 │  ├─ requirements.txt       ← attacker deps: pymodbus, pysnmp, python-snap7
 │  └─ .venv/                 ← attacker Python env (NOT the analysis one)
 │
@@ -128,6 +130,8 @@ docker run -d --name conpot --restart unless-stopped `
   -p 127.0.0.1:102:10201/tcp `
   -p 127.0.0.1:161:16100/udp `
   -p 127.0.0.1:8080:8800/tcp `
+  -p 127.0.0.1:2121:2121/tcp `
+  -p 127.0.0.1:47808:47808/udp `
   conpot-ics:latest
 ```
 
@@ -173,7 +177,7 @@ docker ps                    # confirm the `conpot` row shows "Up" with the 127.
 ```
 
 Expected: one `conpot` row, `Up …`, ports
-`127.0.0.1:502->5020/tcp, 127.0.0.1:102->10201/tcp, 127.0.0.1:161->16100/udp, 127.0.0.1:8080->8800/tcp`.
+`127.0.0.1:502->5020/tcp, 127.0.0.1:102->10201/tcp, 127.0.0.1:161->16100/udp, 127.0.0.1:8080->8800/tcp` (plus `2121->2121/tcp` for FTP and `47808->47808/udp` for BACnet).
 
 Confirm the ports actually answer:
 
