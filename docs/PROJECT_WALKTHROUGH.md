@@ -105,7 +105,14 @@ honeypot/
 **3.1 Install Docker Desktop** (Windows) and make sure it's running (whale icon in
 the tray, "Engine running").
 
-**3.2 Create the honeypot container** (pulls the image the first time):
+**3.2 Build the honeypot image** (pulls `honeynet/conpot` the first time, then bakes in
+the repo's custom template so Modbus returns real process data). From the repo root:
+
+```powershell
+docker build -t conpot-ics:latest .
+```
+
+**3.3 Create the honeypot container:**
 
 ```powershell
 docker run -d --name conpot --restart unless-stopped `
@@ -113,7 +120,7 @@ docker run -d --name conpot --restart unless-stopped `
   -p 127.0.0.1:102:10201/tcp `
   -p 127.0.0.1:161:16100/udp `
   -p 127.0.0.1:8080:8800/tcp `
-  honeynet/conpot:latest
+  conpot-ics:latest
 ```
 
 What this does: Conpot inside the container listens on high ports (5020/16100/10201/8800
@@ -192,9 +199,12 @@ cd ..
 - **SNMP** prints a full Siemens identity — `sysDescr = Siemens, SIMATIC, S7-200`,
   `sysName = CP 443-1 EX40`, `sysLocation = Venus`, plus a system WALK. This is the
   money shot: a scanner now believes this is a real PLC.
-- **Modbus** connects, and every read/write returns `IllegalAddress`. That is
-  **normal** for the stock Conpot template (it defines no register values); the
-  requests are still logged, which is all we need.
+- **Modbus** connects and returns **real values** from the custom template's slave 1:
+  coils (pump/valve states), discrete inputs (status), holding registers (setpoints,
+  e.g. `[1480, 1465, 85, 20, 650, 0, 500, 0, ...]`) and input registers (sensors,
+  e.g. `[412, 538, 1260, 236, 74, ...]`). The **write to holding register 0 is accepted**
+  and the read-back shows `1234` — a realistic tamper. (On the stock template these all
+  return `IllegalAddress`; still logged, just less convincing.)
 - **S7comm** establishes a session, then `get_cpu_info()` fails to parse
   ("…must contain exactly 12 bytes" / "request not implemented"). Also expected —
   it's an emulation-vs-library mismatch; the connection is still logged. S7 is a bonus.
@@ -276,7 +286,7 @@ Run the test suite the same way (from the root):
 | `ModuleNotFoundError: No module named 'analysis'` (or `parser`) | You ran it from `attacker\` or the wrong venv. `cd C:\Users\wahee\honeypot` and use the **root** `.venv`. |
 | `TcpTestSucceeded : False` on 502/102/8080 | Container not up. `docker start conpot`; check Docker Desktop is running; `docker ps`. |
 | Probes hang / "Honeypot not reachable" | Same as above — start the container; it can lag a couple of seconds after `docker start`. |
-| Modbus reads all say `IllegalAddress` | **Normal** — stock template has no register data. The requests are still logged. |
+| Modbus reads say `IllegalAddress` | You're on the **stock** template. Build/run the custom image (`docker build -t conpot-ics:latest .`) so slave 1 has register data. On stock it's harmless — requests are still logged. |
 | S7 `get_cpu_info()` error | **Normal** — Conpot/snap7 mismatch; the session is still logged. S7 is optional. |
 | Attacker shows as `172.17.0.1` not a real IP | Docker gateway rewrites the source (the parser flags `is_docker_gateway`). Expected on localhost. |
 | `Activate.ps1 cannot be loaded` | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned` in that terminal. |

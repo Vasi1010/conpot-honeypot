@@ -30,7 +30,7 @@ ICS ports to the laptop's loopback, so from the laptop you always attack
 | Where | Software | How to get it | Needed? |
 |-------|----------|---------------|---------|
 | This laptop | **Docker Desktop** (Windows) | <https://www.docker.com/products/docker-desktop/> | Yes — install first (Part 0). |
-| This laptop | **Conpot image** | `docker pull honeynet/conpot` (Part A) | Yes |
+| This laptop | **Conpot image** | built from the repo `Dockerfile` with `docker build` (Part A) — extends `honeynet/conpot` with a custom template | Yes |
 | This laptop | **Python 3.x** | <https://www.python.org/downloads/> (tick "Add to PATH") | Already installed (3.13). |
 | This laptop | **Probe deps** (pymodbus, pysnmp, snap7) | `pip install -r requirements.txt` in `attacker\` (Part C) | Yes |
 | This laptop | **Analysis deps** (pandas, matplotlib, streamlit) | `pip install -r requirements.txt` at the repo root | For the analysis side (see PROJECT_WALKTHROUGH.md) |
@@ -62,11 +62,16 @@ the old pysnmp 4.4 is broken on Python 3.12+.
 
 ---
 
-## Part A — Pull & run Conpot in Docker
+## Part A — Build & run Conpot in Docker
 
-1. 🪟 **[Laptop]** Pull the pre-built Conpot image:
+This project ships a **custom Conpot template** (`conpot_template/`, baked into the image
+by the repo `Dockerfile`) so the Modbus slave returns realistic process data — a small
+pumping/water-treatment station — instead of `IllegalAddress`. Build the image, then run it.
+
+1. 🪟 **[Laptop]** Build the image from the repo root (pulls `honeynet/conpot` the first
+   time, then layers the custom template on top):
    ```powershell
-   docker pull honeynet/conpot:latest
+   docker build -t conpot-ics:latest .
    ```
 
 2. 🪟 **[Laptop]** Start Conpot **detached**, named `conpot`, publishing the
@@ -78,7 +83,7 @@ the old pysnmp 4.4 is broken on Python 3.12+.
      -p 127.0.0.1:102:10201/tcp `
      -p 127.0.0.1:161:16100/udp `
      -p 127.0.0.1:8080:8800/tcp `
-     honeynet/conpot:latest
+     conpot-ics:latest
    ```
    | Laptop (127.0.0.1) port | Container port | Service |
    |-------------------------|----------------|---------|
@@ -91,7 +96,7 @@ the old pysnmp 4.4 is broken on Python 3.12+.
    > project's container), so we map HTTP to **8080**. The probes don't use HTTP,
    > so this only matters for the browser check in Part B — adjust if yours differs.
    >
-   > **Why high container ports (5020 etc.)?** The honeynet/conpot image runs Conpot
+   > **Why high container ports (5020 etc.)?** The base honeynet/conpot image runs Conpot
    > as a non-root user, so it binds high ports inside the container. `-p` maps them
    > down to the familiar 502/102/161 on the laptop.
    >
@@ -184,8 +189,12 @@ The scripts already target `127.0.0.1` (the published ports). Keep the
     ```powershell
     python modbus_probe.py
     ```
-    > Every read/write returning `IllegalAddress` is **normal** — the stock Conpot
-    > template defines no register values. The requests are still logged.
+    > With the custom template, slave 1 returns **real values**: coils (pump/valve
+    > states), discrete inputs (status contacts), holding registers (setpoints, e.g.
+    > `[1480, 1465, 85, 20, 650, 0, 500, 0, ...]`) and input registers (sensors, e.g.
+    > `[412, 538, 1260, 236, 74, ...]`), and the **write to holding register 0 is
+    > accepted** (read-back shows `1234`) — a realistic tamper. (On the *stock* template
+    > these all return `IllegalAddress`, which is also fine — just less convincing.)
 
 13. 🪟 **[Laptop]** SNMP — GET on system OIDs + a WALK (community `public`):
     ```powershell
