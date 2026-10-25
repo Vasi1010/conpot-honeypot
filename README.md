@@ -1,29 +1,40 @@
 # Conpot ICS/PLC Honeypot — Project
 
 An ICS/SCADA honeypot built on [Conpot](https://github.com/mushorg/conpot), run in
-Docker inside an Ubuntu VM (VirtualBox) and probed from a Windows laptop over the
-LAN. This repository holds **the attacker side** of a two-person university project:
+**Docker on the laptop** (ports published on `127.0.0.1`) and probed locally. A custom
+Conpot template makes the Modbus slave return realistic process data. This is a
+two-person university project:
 
-- **This half (attacker + deployment):** get Conpot running, probe it over Modbus,
-  SNMP and S7comm, and produce a clean `conpot.log`.
-- **Teammate's half:** log analysis + dashboard.
+- **Attacker + deployment:** build/run Conpot in Docker, probe it over Modbus, SNMP and
+  S7comm (plus a `rich` attack console), and produce a clean `conpot.log`.
+- **Analysis + dashboard:** parse the log, score per-IP risk, and show it live — including
+  an **Attack Simulator** tab that drives the attack from the UI.
 
-> ⚠️ **Scope / ethics.** Everything here targets *our own* honeypot VM on a private
-> LAN, for a university assignment. Conpot is purpose-built to be probed. Do not point
-> these scripts at any host you do not own or have written permission to test.
+New here? Read **`docs/PROJECT_WALKTHROUGH.md`** (from zero to a live attack) or
+**`docs/SETUP_GUIDE.md`** (numbered install). The honeypot ran in a VirtualBox VM in an
+earlier phase; it now runs directly in Docker Desktop on the laptop.
+
+> ⚠️ **Scope / ethics.** Everything here targets *our own* honeypot on localhost, for a
+> university assignment. Conpot is purpose-built to be probed, and the attack console
+> refuses any non-loopback / non-private target. Do not point these scripts at a host you
+> do not own or have written permission to test.
 
 ## Layout
 
 ```
 conpot-honeypot/
-├── attacker/              # probe scripts run from the Windows laptop
-│   ├── modbus_probe.py    # Modbus reads + a write attempt (pymodbus 3.6.9, slave=1)
+├── Dockerfile             # builds conpot-ics:latest = honeynet/conpot + custom template
+├── conpot_template/       # custom Conpot template (slave 1 returns real Modbus data)
+├── attacker/              # probe scripts, run locally against 127.0.0.1
+│   ├── attack.py          # one-shot combined attack (modbus -> snmp -> s7comm)
+│   ├── modbus_probe.py    # Modbus reads + a write (pymodbus 3.6.9, slave=1)
 │   ├── snmp_query.py      # SNMP GET/WALK (pysnmp, with snmpwalk fallback in comments)
 │   ├── s7_read.py         # optional S7comm identification read (python-snap7)
 │   └── requirements.txt
-├── docs/
-│   └── SETUP_GUIDE.md     # numbered, copy-paste setup guide (for the viva)
-├── logs/                  # drop the captured conpot.log here to hand off
+├── scripts/
+│   └── attack.py          # rich coloured attack console (Recon/Fingerprint/Read/Write)
+├── docs/                  # SETUP_GUIDE, PROJECT_WALKTHROUGH, VIVA_WALKTHROUGH, ...
+├── logs/                  # captured conpot.log lands here (git-ignored)
 │
 ├── parser/                # analysis: conpot.log -> pandas DataFrame
 │   ├── patterns.py        #   line shapes (edit this if real lines don't match)
@@ -34,8 +45,10 @@ conpot-honeypot/
 │   ├── detection.py       # Low/Medium/High risk per source IP
 │   └── charts.py          # report/PPT charts (PNG) + CSV export
 ├── dashboard/
-│   ├── app.py             # Streamlit live dashboard
-│   └── data.py            # log -> snapshot (KPIs, risk, gateway share)
+│   ├── app.py             # Streamlit dashboard + Attack Simulator tab
+│   ├── data.py            # log -> snapshot (KPIs, risk, gateway share); load_docker()
+│   ├── plotly_charts.py   # interactive dashboard charts
+│   └── simulator.py       # drives scripts/attack.py + reads the attack chain back
 └── tests/                 # pytest suite
 ```
 
@@ -116,39 +129,46 @@ streamlit run dashboard/app.py          # opens http://localhost:8501
 ```
 
 - **Log source:** the sidebar takes a file path (default `logs/conpot.log`, or set the
-  `CONPOT_LOG` environment variable) or an uploaded file.
-- **Live view:** it re-reads the file every few seconds (adjustable, or pause it), so
-  copying a fresh `conpot.log` into `logs/` updates the page within seconds. For a live
-  feed from the VM, keep overwriting that file, e.g. `docker logs conpot > logs/conpot.log`.
-- **What it shows:** KPI cards (total events, unique IPs, write attempts, High-risk IPs),
-  the four report charts, the risk-per-IP table, and the latest events.
+  `CONPOT_LOG` environment variable), an uploaded file, or **Live from Docker** — which runs
+  `docker logs conpot` on every refresh, so no manual export is needed.
+- **Live view:** it re-reads the source every few seconds (adjustable, or pause it), so new
+  events show up within seconds.
+- **What it shows:** a threat-level posture banner, KPI cards (total events, unique IPs,
+  write attempts, High-risk IPs), interactive Plotly charts, the colour-coded risk-per-IP
+  table, and the latest events.
+- **Attack Simulator tab:** drive the attack from the UI (Scan / Read / Write / Full), watch
+  its output stream into a terminal panel, and see the **scan → read → write** chain light up
+  with a PLC-status card and an attacker → honeypot network view.
 - **Warnings:** a red alert lists the IPs that attempted writes. A yellow warning appears
-  when more than half the traffic comes from a Docker gateway IP (`172.17.0.1`), which
-  means Docker NAT is hiding the real attackers; run Conpot with `--network host`.
-- **Bad input:** a missing, empty or garbled log shows a waiting/empty state instead of
-  crashing.
+  when more than half the traffic comes from a Docker gateway IP (`172.17.0.1`), which means
+  Docker NAT is hiding the real attackers; run Conpot with `--network host`.
+- **Bad input:** a missing, empty or garbled log (or an unreachable container) shows a
+  waiting/empty state instead of crashing.
 
-## Port map (VM)
+## Port map (published on 127.0.0.1)
 
-| Service | Conpot container port | VM (host) port |
-|---------|-----------------------|----------------|
-| HTTP    | 8800                  | 80             |
-| S7comm  | 10201                 | 102            |
-| Modbus  | 5020                  | 502            |
-| SNMP    | 16100/udp             | 161/udp        |
+| Service | Conpot container port | Laptop port |
+|---------|-----------------------|-------------|
+| HTTP    | 8800                  | 8080        |
+| S7comm  | 10201                 | 102         |
+| Modbus  | 5020                  | 502         |
+| SNMP    | 16100/udp             | 161/udp     |
 
-## Quick start (attacker side)
+## Quick start
 
-```bash
+```powershell
+# 1. build + run the honeypot (from the repo root)
+docker build -t conpot-ics:latest .
+docker run -d --name conpot --restart unless-stopped `
+  -p 127.0.0.1:502:5020/tcp -p 127.0.0.1:102:10201/tcp `
+  -p 127.0.0.1:161:16100/udp -p 127.0.0.1:8080:8800/tcp conpot-ics:latest
+
+# 2. attack it (scripts already target 127.0.0.1)
 cd attacker
-python -m venv .venv
-# Windows PowerShell:  .venv\Scripts\Activate.ps1
+python -m venv .venv ; .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-
-# edit VM_IP at the top of each script, then:
-python modbus_probe.py
-python snmp_query.py
-python s7_read.py        # optional
+python attack.py            # or modbus_probe.py / snmp_query.py / s7_read.py
 ```
 
-See `docs/SETUP_GUIDE.md` for the full, numbered walkthrough.
+See `docs/PROJECT_WALKTHROUGH.md` (from zero to a live attack) or `docs/SETUP_GUIDE.md`
+(numbered install) for the full walkthrough.

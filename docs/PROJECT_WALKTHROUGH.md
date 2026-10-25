@@ -53,6 +53,9 @@ The project has **two halves** that meet at one file — the honeypot's log.
 
 ```
 honeypot/
+├─ Dockerfile                ← builds conpot-ics:latest (honeynet/conpot + custom template)
+├─ conpot_template/          ← custom Conpot template: slave 1 returns REAL Modbus data
+│
 ├─ attacker/                 ← HALF 1: the attack scripts (own venv)
 │  ├─ attack.py              ← one-shot COMBINED attack: runs all 3 probes in order
 │  ├─ modbus_probe.py        ← Modbus/TCP: reads coils/registers, then a WRITE
@@ -60,6 +63,9 @@ honeypot/
 │  ├─ s7_read.py             ← S7comm: connect + identification read (optional/bonus)
 │  ├─ requirements.txt       ← attacker deps: pymodbus, pysnmp, python-snap7
 │  └─ .venv/                 ← attacker Python env (NOT the analysis one)
+│
+├─ scripts/                  ← second attacker
+│  └─ attack.py              ← rich coloured TERMINAL console (Recon/Fingerprint/Read/Write)
 │
 ├─ parser/                   ← HALF 2a: raw log → structured events
 │  ├─ __main__.py            ← lets you run `python -m parser <log>`
@@ -73,16 +79,18 @@ honeypot/
 │  └─ charts.py              ← 4 PNG charts + 2 CSVs from the parsed table
 │
 ├─ dashboard/                ← HALF 2c: the live view
-│  ├─ app.py                 ← Streamlit UI (KPI tiles, risk table, charts, auto-refresh)
-│  └─ data.py                ← loads a log into a Snapshot (parse + score + KPIs); testable
+│  ├─ app.py                 ← Streamlit UI: Dashboard tab + Attack Simulator tab
+│  ├─ data.py                ← log → Snapshot (parse + score + KPIs); load_docker() live source
+│  ├─ plotly_charts.py       ← interactive dashboard charts
+│  └─ simulator.py           ← drives scripts/attack.py + reads the attack chain back
 │
-├─ tests/                    ← pytest suite (79 tests) covering parser/detection/charts/dashboard
+├─ tests/                    ← pytest suite covering parser/detection/charts/dashboard/simulator
 ├─ sample_logs/              ← anonymised example logs so the analysis runs without a live capture
 ├─ slides/                   ← LaTeX Beamer deck (presentation.tex/.pdf) + figures/
-├─ docs/                     ← this guide, VIVA_WALKTHROUGH.md, SETUP_GUIDE.md (old VM path)
+├─ docs/                     ← this guide, SETUP_GUIDE, VIVA_WALKTHROUGH, ATTACK_VIEW_PROMPT
 ├─ output/                   ← generated charts + CSVs land here (gitignored)
 ├─ logs/                     ← conpot.log lands here (gitignored — it can contain real IPs)
-├─ requirements.txt          ← ANALYSIS deps: pandas, matplotlib, streamlit, tzdata, pytest
+├─ requirements.txt          ← ANALYSIS deps: pandas, matplotlib, streamlit, plotly, rich, …
 └─ README.md                 ← short project overview
 ```
 
@@ -252,13 +260,19 @@ That's the classic recon-to-tamper pattern — a write + multi-protocol scan = H
 .\.venv\Scripts\python.exe -m streamlit run dashboard\app.py
 ```
 
-A browser opens `http://localhost:8501`. It reads `logs\conpot.log` and shows KPI
-tiles (events, source IPs, write attempts), the red **"Write attempts (High risk)"**
-banner, the per-IP risk table, and the charts. Stop it with `Ctrl+C` in the terminal.
+A browser opens `http://localhost:8501`. It shows a threat-level posture banner, KPI
+tiles (events, source IPs, write attempts, High-risk IPs), interactive Plotly charts, the
+colour-coded per-IP risk table, and the latest events. Stop it with `Ctrl+C`.
 
-> **Nuance:** the dashboard reads the **file** `logs\conpot.log`. If you run another
-> live probe, re-run Step 3 (`docker logs conpot > logs\conpot.log`) to refresh the
-> file, then the dashboard's numbers update.
+- **Log source (sidebar):** a file path (default `logs\conpot.log`), an upload, or
+  **Live from Docker** — which runs `docker logs conpot` on every refresh, so you don't
+  need to re-export the log by hand (Step 3) at all. Pick that for a live demo.
+- **Attack Simulator tab:** run the attack *from the dashboard* (Scan / Read / Write / Full
+  buttons), watch its output stream into a terminal panel, and see the **scan → read →
+  write** chain light up with a PLC-status card and an attacker → honeypot network view.
+
+> **Nuance (file source only):** when the source is the **file** `logs\conpot.log`, re-run
+> Step 3 to refresh it after a new probe. The **Live from Docker** source skips that.
 
 ---
 

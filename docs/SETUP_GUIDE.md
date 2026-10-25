@@ -183,6 +183,11 @@ The scripts already target `127.0.0.1` (the published ports). Keep the
     python attack.py
     ```
 
+    > There's also a second, coloured **terminal console** at `scripts/attack.py` (run from
+    > the repo root: `python scripts/attack.py --phase all`). It walks Recon → Fingerprint →
+    > Read → Write with a live summary, refuses any non-loopback/private target, and is what
+    > the dashboard's **Attack Simulator** tab drives.
+
     Or run them **individually**:
 
 12. 🪟 **[Laptop]** Modbus — reads (coils/inputs/registers) + a write attempt:
