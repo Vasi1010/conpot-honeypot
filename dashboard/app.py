@@ -14,24 +14,24 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root, for parser/analysis
 
-import matplotlib.pyplot as plt  # noqa: E402
 import streamlit as st  # noqa: E402
 import streamlit.components.v1 as components  # noqa: E402
 
-from analysis import charts  # noqa: E402
 from analysis.detection import DEFAULT_WINDOW_S  # noqa: E402
+from dashboard import plotly_charts as charts  # noqa: E402  (report PNGs still use analysis.charts)
 from dashboard import simulator  # noqa: E402
 from dashboard.data import DEFAULT_CONTAINER, DEFAULT_LOG, file_signature, load, load_docker  # noqa: E402
 from parser import DEFAULT_TZ  # noqa: E402
 
 st.set_page_config(page_title="Conpot honeypot dashboard", page_icon="🛡️", layout="wide")
 
-# Risk → colours, shared by the posture banner and the risk table.
+# Risk → (background, text) colours for the SOC dark theme, shared by the
+# posture banner and the risk-table badges. Saturated chips on a dark page.
 RISK_STYLE = {
-    "High": ("#fdecea", "#b21f14"),
-    "Medium": ("#fff5e6", "#8a5a00"),
-    "Low": ("#e8f6ee", "#157a4e"),
-    "Info": ("#eef2f6", "#5a6a7a"),
+    "High": ("#e74c3c", "#180a08"),
+    "Medium": ("#e6a817", "#1b1403"),
+    "Low": ("#2ecc71", "#07251a"),
+    "Info": ("#46566a", "#e6edf3"),
 }
 
 
@@ -64,17 +64,25 @@ def inject_css():
           .hp-posture .txt { font-size:.9rem; }
           .hp-posture .txt b { font-weight:600; }
 
-          /* metric tiles */
-          div[data-testid="stMetric"] { background:#fff; border:1px solid #e2e8ee; border-radius:12px;
-            padding:14px 16px; box-shadow:0 1px 2px rgba(16,28,42,.05); }
+          /* metric tiles (dark SOC panels) */
+          div[data-testid="stMetric"] { background:#161b22; border:1px solid #30363d; border-radius:12px;
+            padding:14px 16px; box-shadow:0 1px 2px rgba(0,0,0,.35); }
           div[data-testid="stMetricLabel"] p { font-family:'IBM Plex Mono',monospace; font-size:.7rem;
-            letter-spacing:.08em; text-transform:uppercase; color:#5a6a7a; }
-          div[data-testid="stMetricValue"] { font-weight:700; }
+            letter-spacing:.08em; text-transform:uppercase; color:#8b98a9; }
+          div[data-testid="stMetricValue"] { font-weight:700; color:#e6edf3; }
+
+          /* tabs: SOC-style pill row */
+          .stTabs [data-baseweb="tab-list"] { gap:6px; }
+          .stTabs [data-baseweb="tab"] { font-family:'IBM Plex Mono',monospace; letter-spacing:.04em; }
+
+          /* terminal-style code panels (attack output) */
+          .stCode, pre { background:#0b0f14 !important; border:1px solid #1e2631; border-radius:10px; }
+          code, pre, .stCode span { font-family:'IBM Plex Mono',monospace !important; }
 
           /* section headings */
-          h2, h3 { letter-spacing:-.01em; }
-          .stDataFrame { border-radius:10px; overflow:hidden; }
-          hr { margin:1.1rem 0; }
+          h2, h3 { letter-spacing:-.01em; color:#e6edf3; }
+          .stDataFrame { border-radius:10px; overflow:hidden; border:1px solid #30363d; }
+          hr { margin:1.1rem 0; border-color:#1e2631; }
         </style>
         """,
         unsafe_allow_html=True,
@@ -177,8 +185,7 @@ def show_kpis(snap):
 
 def show_chart(col, fig):
     with col:
-        st.pyplot(fig, width="stretch")
-    plt.close(fig)
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
 def show_risk_table(risk):
