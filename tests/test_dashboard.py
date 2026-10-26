@@ -43,6 +43,18 @@ def test_load_never_raises(tmp_path, content):
     assert snap.stats.file_missing == (content is None)
 
 
+def test_filter_since_keeps_only_later_events():
+    from dashboard.data import filter_since
+    snap = load(SAMPLES / "conpot_sample.log")
+    assert len(snap.df) == 40
+    cutoff = snap.df["timestamp"].sort_values().iloc[20]
+    fewer = filter_since(snap, cutoff)
+    assert 0 < len(fewer.df) < len(snap.df)
+    assert (fewer.df["timestamp"] > cutoff).all()
+    assert fewer.kpis["Total events"] == len(fewer.df)
+    assert filter_since(snap, None) is snap  # no baseline -> unchanged
+
+
 # --------------------------------------------------------------------------- Streamlit app
 
 def run_app(monkeypatch, log):

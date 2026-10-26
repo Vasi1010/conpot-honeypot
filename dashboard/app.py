@@ -20,7 +20,7 @@ import streamlit.components.v1 as components  # noqa: E402
 from analysis.detection import DEFAULT_WINDOW_S  # noqa: E402
 from dashboard import plotly_charts as charts  # noqa: E402  (report PNGs still use analysis.charts)
 from dashboard import simulator  # noqa: E402
-from dashboard.data import DEFAULT_CONTAINER, DEFAULT_LOG, file_signature, load, load_docker  # noqa: E402
+from dashboard.data import DEFAULT_CONTAINER, DEFAULT_LOG, file_signature, filter_since, load, load_docker  # noqa: E402
 from parser import DEFAULT_TZ  # noqa: E402
 
 st.set_page_config(page_title="Conpot honeypot dashboard", page_icon="🛡️", layout="wide")
@@ -33,6 +33,18 @@ RISK_STYLE = {
     "Low": ("#2ecc71", "#07251a"),
     "Info": ("#46566a", "#e6edf3"),
 }
+
+# The Dockerized Conpot logs timestamps in UTC; show them in the viewer's local
+# time so they line up with the wall clock during a demo.
+LOCAL_TZ = datetime.now().astimezone().tzinfo
+
+
+def to_local(series):
+    """Convert a tz-aware timestamp Series to local time (no-op if not tz-aware)."""
+    try:
+        return series.dt.tz_convert(LOCAL_TZ)
+    except (TypeError, AttributeError):
+        return series
 
 
 def inject_css():
@@ -133,26 +145,56 @@ with st.sidebar:
 
     st.header("Detection")
     window_s = st.number_input("Multi-protocol scan window (s)", 1, 3600, int(DEFAULT_WINDOW_S), key="window")
-    tz = st.text_input("Log timezone", value=DEFAULT_TZ, key="tz",
-                       help="Timezone of the timestamps in the log (IANA name, e.g. UTC)")
+    tz = st.text_input("Log timezone", value="UTC", key="tz",
+                       help="Timezone the log's timestamps are in. The Dockerized Conpot logs "
+                            "in UTC; the dashboard then shows them in your local time.")
+
+    st.header("View")
+    if st.button("🔄 Reset events", key="reset_btn", width="stretch",
+                 help="Zero the counts and charts from now. New attacks climb from zero. "
+                      "Non-destructive — the honeypot and its log are untouched."):
+        st.session_state["reset_pending"] = True
+    _ra = st.session_state.get("reset_at")
+    if _ra is not None:
+        st.caption(f"Counting events since the reset at {_ra.tz_convert(LOCAL_TZ):%H:%M:%S}.")
+        if st.button("Clear reset", key="clear_reset_btn", width="stretch"):
+            st.session_state.pop("reset_at", None)
+            st.session_state.pop("reset_pending", None)
 
 
 inject_css()
 render_header()
 
 
+def apply_reset(snap):
+    """Apply the sidebar 'Reset events' baseline: a non-destructive view filter.
+
+    On the click we record the latest event time as the baseline; from then on only
+    events after it are shown, so the view starts at zero and climbs with new attacks.
+    Works for every source and never touches the log.
+    """
+    if snap is None or snap.docker_error or snap.stats.file_missing:
+        return snap
+    if st.session_state.pop("reset_pending", False):
+        st.session_state["reset_at"] = snap.df["timestamp"].max() if len(snap.df) else None
+    return filter_since(snap, st.session_state.get("reset_at"), window_s)
+
+
 def get_snapshot():
     try:
         if upload is not None:
-            return load_upload(upload.getvalue(), upload.name, tz, window_s)
-        if container is not None:
+            snap = load_upload(upload.getvalue(), upload.name, tz, window_s)
+        elif container is not None:
             # Not cached: we want a fresh `docker logs` read on every refresh.
-            return load_docker(container.strip() or DEFAULT_CONTAINER, tz, window_s)
-        if path is not None:
-            return load_path(path, file_signature(path), tz, window_s)
+            snap = load_docker(container.strip() or DEFAULT_CONTAINER, tz, window_s)
+        elif path is not None:
+            snap = load_path(path, file_signature(path), tz, window_s)
+        else:
+            return None
     except Exception as exc:  # e.g. an unknown timezone typed in the sidebar
         st.error(f"Could not load the log: {exc}")
-    return None
+        return None
+    return apply_reset(snap)
 
 
 def show_posture(snap):
@@ -192,7 +234,7 @@ def show_risk_table(risk):
     st.subheader("Risk per source IP")
     table = risk.copy()
     for c in ("first_seen", "last_seen"):
-        table[c] = table[c].dt.strftime("%Y-%m-%d %H:%M:%S")
+        table[c] = to_local(table[c]).dt.strftime("%Y-%m-%d %H:%M:%S")
     order = ["src_ip", "risk", "sequence", "write_flag", "scans", "reads", "writes",
              "multi_protocol_scan", "protocols", "events", "first_seen", "last_seen",
              "is_private", "is_docker_gateway"]
@@ -217,7 +259,8 @@ def show_risk_table(risk):
 
 def show_parse_stats(snap):
     s = snap.stats
-    st.caption(f"Source: `{snap.source}` · {s.lines:,} lines · {s.parsed:,} events · "
+    suffix = f" · showing {len(snap.df):,} since reset" if st.session_state.get("reset_at") is not None else ""
+    st.caption(f"Source: `{snap.source}` · {s.lines:,} lines · {s.parsed:,} events{suffix} · "
                f"{s.ignored:,} ignored · {s.unparseable:,} unparseable · "
                f"refreshed {datetime.now():%H:%M:%S}")
     if s.unmatched:
@@ -272,7 +315,9 @@ def dashboard():
     st.divider()
     show_risk_table(snap.risk)
     with st.expander("Latest events"):
-        latest = snap.df.drop(columns=["raw", "session_id", "pattern"]).tail(50).iloc[::-1]
+        latest = snap.df.drop(columns=["raw", "session_id", "pattern"]).tail(50).iloc[::-1].copy()
+        if "timestamp" in latest.columns:
+            latest["timestamp"] = to_local(latest["timestamp"])
         st.dataframe(latest, hide_index=True, width="stretch")
     show_parse_stats(snap)
 

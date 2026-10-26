@@ -49,6 +49,17 @@ def resolve(path):
     return ROOT / p
 
 
+def _assemble(df, stats, source, window_s):
+    """Build a Snapshot (risk, KPIs, gateway share) from an events table."""
+    risk = detect(df, window_s)
+    gw = df[df["is_docker_gateway"]]
+    return Snapshot(
+        df=df, risk=risk, stats=stats, source=source, kpis=kpis(df, risk),
+        gateway_share=len(gw) / len(df) if len(df) else 0.0,
+        gateway_ips=sorted(gw["src_ip"].unique()),
+    )
+
+
 def load(path=None, data=None, name=None, tz=DEFAULT_TZ, window_s=DEFAULT_WINDOW_S):
     """Parse `data` (uploaded bytes) if given, else the file at `path`."""
     stats = ParseStats()
@@ -59,13 +70,23 @@ def load(path=None, data=None, name=None, tz=DEFAULT_TZ, window_s=DEFAULT_WINDOW
         p = resolve(path or DEFAULT_LOG)
         df = parse_log(p, tz, stats)
         source = str(p)
-    risk = detect(df, window_s)
-    gw = df[df["is_docker_gateway"]]
-    return Snapshot(
-        df=df, risk=risk, stats=stats, source=source, kpis=kpis(df, risk),
-        gateway_share=len(gw) / len(df) if len(df) else 0.0,
-        gateway_ips=sorted(gw["src_ip"].unique()),
-    )
+    return _assemble(df, stats, source, window_s)
+
+
+def filter_since(snap, since, window_s=DEFAULT_WINDOW_S):
+    """Return a new Snapshot keeping only events strictly after `since`.
+
+    Used by the dashboard's "reset" button: a non-destructive baseline that zeroes
+    the view from a moment in time (works for any source — file, upload or Docker)
+    without touching the log. `since` is a pandas Timestamp; None returns `snap`
+    unchanged. `stats` is kept as-is (it describes the whole log, not the view).
+    """
+    if since is None or snap is None or not len(snap.df):
+        return snap
+    df = snap.df[snap.df["timestamp"] > since].reset_index(drop=True)
+    out = _assemble(df, snap.stats, snap.source, window_s)
+    out.docker_error = snap.docker_error
+    return out
 
 
 def docker_logs(container=DEFAULT_CONTAINER, timeout=DOCKER_TIMEOUT):
