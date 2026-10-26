@@ -102,3 +102,21 @@ def test_run_against_closed_port_reports_results(monkeypatch):
     assert results  # produced Result rows for every stage without raising
     statuses = {r.status for r in results}
     assert statuses <= {"open", "closed", "accepted", "rejected", "no-response", "error"}
+
+
+def test_installed_pymodbus_matches_attack_api():
+    """Guard the live Read/Write phases against a breaking pymodbus upgrade.
+
+    scripts/attack.py calls read_holding_registers / read_coils / write_register with
+    `slave=`. pymodbus 3.7+ renamed that to `device_id`, which breaks every Modbus
+    read/write against a live honeypot while every (offline) unit test still passes.
+    requirements.txt pins pymodbus<3.7 for this reason; this test fails loudly in CI
+    if that pin ever drifts.
+    """
+    import inspect
+    from pymodbus.client import ModbusTcpClient
+    for method in ("read_holding_registers", "read_coils", "write_register"):
+        params = inspect.signature(getattr(ModbusTcpClient, method)).parameters
+        assert "slave" in params, (
+            f"ModbusTcpClient.{method} no longer accepts slave= — pymodbus is too new "
+            "for scripts/attack.py (3.7+ renamed it to device_id). Pin pymodbus<3.7.")
